@@ -1,0 +1,208 @@
+@import "variables";
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background-color: $bg-canvas;
+}
+
+// Top Navigation bar
+.top-nav {
+  height: 64px;
+  background-color: #FFFFFF;
+  border-bottom: 1px solid $border-color;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 100;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+
+    .logo-box {
+      width: 36px;
+      height: 36px;
+      background-color: $color-primary;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
+      svg {
+        width: 20px;
+        height: 20px;
+      }
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: $color-text-header;
+      letter-spacing: -0.02em;
+    }
+  }
+
+  .nav-tabs {
+    display: flex;
+    height: 100%;
+    margin-left: 32px;
+
+    .nav-tab-btn {
+      height: 100%;
+      border: none;
+      background: transparent;
+      padding: 0 20px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: $color-text-muted;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      &:hover {
+        color: $color-primary;
+        background-color: rgba($color-primary, 0.02);
+      }
+
+      &.active {
+        color: $color-primary;
+        border-bottom-color: $color-primary;
+        font-weight: 700;
+      }
+    }
+  }
+
+  .user-status-area {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      color: $color-primary;
+      background-color: $bg-sidebar;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      border: 1px solid $border-accent;
+      font-weight: 600;
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        background-color: #22c55e;
+        border-radius: 50%;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+      }
+    }
+
+    .btn-logout {
+      background: none;
+      border: 1px solid $border-color;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: $color-text;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+
+      &:hover {
+        background-color: #F5F5F0;
+        border-color: $color-text-muted;
+      }
+    }
+  }
+}
+
+// Main Frame split: Menu + Workspace
+.main-frame {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+// Left Sidebar for internal navigation (Admins/Teachers)
+.dashboard-sidebar {
+  width: 240px;
+  background-color: $bg-sidebar;
+  border-right: 1px solid $border-color;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+
+  .sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    .sidebar-section-title {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 800;
+      color: $color-text-muted;
+      padding-left: 8px;
+      margin-bottom: 4px;
+    }
+
+    .sidebar-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: $color-text-header;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+
+      &:hover {
+        background-color: $border-color;
+        color: $color-text;
+      }
+
+      &.active {
+        background-color: $color-primary;
+        color: #FFFFFF;
+        font-weight: 600;
+        box-shadow: 0 4px 6px rgba($color-primary, 0.15);
+      }
+
+      svg {
+        width: 16px;
+        height: 16px;
+      }
+    }
+  }
+}
+
+// Workspace Content area
+.workspace-content {
+  flex: 1;
+  background-color: $bg-canvas;
+  padding: 24px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}

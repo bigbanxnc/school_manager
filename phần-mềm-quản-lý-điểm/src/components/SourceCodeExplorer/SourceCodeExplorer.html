@@ -1,0 +1,33 @@
+<main class="workspace-content" style="flex: 1; display: flex; flex-direction: column; padding: 24px;" id="source_explorer_workspace">
+  <div class="workspace-header">
+    <div>
+      <h1 id="source_explorer_title">📁 Mã Nguồn Angular Dự Án (Mô Phỏng)</h1>
+      <p style="font-size: 0.85rem; color: #8E8E85; margin-top: 4px; font-family: sans-serif;">
+        Cấu trúc mã nguồn Angular của hệ thống. Bạn có thể copy trực tiếp mã nguồn này để tích hợp vào ứng dụng Angular thật.
+      </p>
+    </div>
+  </div>
+
+  <div class="code-explorer-container" style="flex: 1;" id="angular_code_explorer_box">
+    <!-- Sidebar files list -->
+    <div class="code-sidebar">
+      <div class="sidebar-header">📂 Angular Files</div>
+      <div class="file-list" id="explorer_file_list">
+        <!-- Dyn list items -->
+      </div>
+    </div>
+
+    <!-- Right Side Editor Viewport -->
+    <div class="code-viewer-panel">
+      <div class="viewer-header">
+        <span class="file-path" id="explorer_file_path">src/app/app.component.ts</span>
+        <button class="btn btn-secondary btn-sm" id="btn_copy_code">
+          📋 Sao chép mã nguồn
+        </button>
+      </div>
+      <div class="code-body">
+        <pre><code id="explorer_code_content">Loading...</code></pre>
+      </div>
+    </div>
+  </div>
+</main>

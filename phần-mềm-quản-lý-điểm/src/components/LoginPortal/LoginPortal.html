@@ -1,0 +1,37 @@
+<div class="login-screen" id="login_portal_screen">
+  <div class="login-card" id="login_form_card">
+     <div class="logo-header">
+       <div class="academic-icon">🏫</div>
+       <h2>Hệ Thống Quản Lý Học Sinh</h2>
+     </div>
+
+     <!-- Dynamic Error Box -->
+     <div class="error-box" id="login_error_box" style="display: none;"></div>
+
+     <form id="form_login_action">
+       <div class="form-group">
+         <label for="login_email_input">Tài khoản (Email)</label>
+         <input 
+           type="email" 
+           id="login_email_input" 
+           placeholder="Ten@gmail.com" 
+           required 
+         />
+       </div>
+
+       <div class="form-group">
+         <label for="login_password_input">Mật khẩu</label>
+         <input 
+           type="password" 
+           id="login_password_input" 
+           placeholder="Nhập mật khẩu" 
+           required 
+         />
+       </div>
+
+       <button type="submit" class="btn-login-submit" id="btn_login_submit">
+         Đăng Nhập Hệ Thống
+       </button>
+     </form>
+  </div>
+</div>

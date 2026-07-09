@@ -1,0 +1,48 @@
+@import "../../styles/variables";
+
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.class-card {
+  background-color: #FFFFFF;
+  border: 1px solid $border-color;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.01);
+  transition: transform 0.2s, box-shadow 0.2s;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(90, 90, 64, 0.05);
+  }
+
+  .class-icon {
+    width: 44px;
+    height: 44px;
+    background-color: rgba($color-primary, 0.08);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: $color-primary;
+  }
+
+  .class-info {
+    h4 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: $color-text-header;
+    }
+    p {
+      font-size: 0.8rem;
+      color: $color-text-muted;
+      font-family: sans-serif;
+    }
+  }
+}

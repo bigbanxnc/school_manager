@@ -1,0 +1,14 @@
+/* ==========================================================================
+   SCSS MAIN COMPILED FILE - NATURAL TONES THEME
+   ========================================================================== */
+
+@import "styles/variables";
+@import "styles/global";
+@import "styles/layout";
+@import "styles/components";
+@import "App";
+@import "components/LoginPortal/LoginPortal";
+@import "components/AdminWorkspace/AdminWorkspace";
+@import "components/TeacherWorkspace/TeacherWorkspace";
+@import "components/StudentWorkspace/StudentWorkspace";
+@import "components/SourceCodeExplorer/SourceCodeExplorer";

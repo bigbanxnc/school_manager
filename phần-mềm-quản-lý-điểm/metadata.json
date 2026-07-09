@@ -1,0 +1,6 @@
+{
+  "name": "Phần mềm Quản lý Điểm",
+  "description": "Hệ thống quản lý điểm học sinh, phân lớp cho giáo viên, tính điểm trung bình và xuất báo cáo CSV ",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

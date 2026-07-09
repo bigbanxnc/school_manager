@@ -1,0 +1,13 @@
+@import "../../styles/variables";
+
+.teacher-meta-badge {
+  background-color: rgba($color-primary, 0.08);
+  border: 1px solid rgba($color-primary, 0.15);
+  color: $color-primary;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 4px;
+  margin-right: 6px;
+  display: inline-block;
+}

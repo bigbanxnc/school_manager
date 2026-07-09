@@ -1,0 +1,165 @@
+<!-- Sidebar layout segment -->
+<aside class="dashboard-sidebar" id="teacher_sidebar_menu">
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">Nhiệm Vụ Giảng Dạy</div>
+    <div style="padding: 0 8px 12px; font-size: 0.8rem; color: #5A5A40; line-height: 1.4;">
+      Học kỳ hiện tại, bạn phụ trách giảng dạy cho các lớp: <br />
+      <div id="teacher_assigned_classes_list" style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px;">
+        <!-- Dyn class list items -->
+      </div>
+    </div>
+
+    <button class="sidebar-btn active" id="teacher_menu_grades_action">
+      📊 Điểm Lớp Quản Lý
+    </button>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">Tiện ích Giáo Viên</div>
+    <button class="sidebar-btn" id="teacher_menu_export">
+      📥 Xuất CSV Lớp Phụ Trách
+    </button>
+  </div>
+</aside>
+
+<!-- Core workspace viewport -->
+<main class="workspace-content" id="teacher_workspace_content">
+  <div class="workspace-header">
+    <div>
+      <h1>Bảng Quản Lý Giáo Viên</h1>
+      <p style="color: #8E8E85; font-size: 0.85rem; margin-top: 4px; font-family: sans-serif;">
+        Chào, <strong id="teacher_name_lbl">Giáo viên</strong>. Giáo viên chỉ có thể <strong>xem danh sách thành viên</strong>, không thể tự thêm/sửa/xóa tài khoản học sinh, nhưng <strong>có quyền xem, sửa, và xóa điểm số</strong> các học sinh thuộc các lớp được phân công dạy.
+      </p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-success" id="teacher_btn_export_csv">
+        📥 Xuất Điểm CSV các lớp phụ trách
+      </button>
+    </div>
+  </div>
+
+  <!-- Search tool -->
+  <div class="search-filter-strip">
+    <div class="search-wrapper">
+      <span class="search-icon">🔍</span>
+      <input 
+        type="text" 
+        placeholder="Tìm mã số, điểm số, tên học sinh, gmail lớp bạn dạy..." 
+        id="teacher_search_input"
+      />
+    </div>
+    <button class="btn btn-secondary btn-sm" id="btn_clear_teacher_search" style="display: none;">
+      Xóa lọc ✕
+    </button>
+  </div>
+
+  <!-- Student grades table -->
+  <div class="panel" style="margin-bottom: 24px;">
+    <div class="workspace-header" style="margin-bottom: 14px;">
+      <h3 style="font-size: 1.15rem; color: #3D3D38;">📈 Điểm Học Sinh Trong Lớp</h3>
+    </div>
+
+    <div class="data-table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Mã Học Sinh</th>
+            <th>Họ và Tên</th>
+            <th>Lớp Học</th>
+            <th>Email / Gmail</th>
+            <th>Điểm Toán</th>
+            <th>Điểm Văn</th>
+            <th>Điểm Anh</th>
+            <th style="background-color: #E5E5DE; text-align: center;">Trung Bình (GPA)</th>
+            <th style="text-align: right;">Thao Tác</th>
+          </tr>
+        </thead>
+        <tbody id="teacher_grades_table_body">
+          <!-- Dynamically populated grades -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Communicate member roster list -->
+  <div class="panel">
+    <div class="workspace-header" style="margin-bottom: 14px;">
+      <h3 style="font-size: 1.15rem; color: #3D3D38;">👥 Danh Sách Thành Viên Phân Hệ Giao Tiếp</h3>
+      <span style="font-size: 0.8rem; color: #8E8E85; font-style: italic;">Không hiển thị các tài khoản Giáo viên khác</span>
+    </div>
+
+    <div class="data-table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Mã Thành Viên</th>
+            <th>Họ và Tên</th>
+            <th>Vai Trò</th>
+            <th>Email / Gmail</th>
+            <th>Lớp Phụ Trách / Theo Học</th>
+          </tr>
+        </thead>
+        <tbody id="teacher_members_table_body">
+          <!-- Dynamically populated members -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- GRADE EDIT MODAL -->
+<div class="modal-backdrop" id="teacher_grade_modal" style="display: none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="modal_student_name_lbl">Nhập & Sửa Điểm</h3>
+      <button class="btn-close-modal" id="btn_close_grade_modal">✕</button>
+    </div>
+    <form id="form_edit_student_grades">
+      <div class="modal-body">
+        <p style="font-size: 0.8rem; color: #8E8E85; margin-bottom: 16px; font-family: sans-serif;">
+          Hệ số điểm từ 0.0 đến 10.0. Để trống ô nhập nếu muốn chuyển điểm về trạng thái "Chưa có".
+        </p>
+
+        <div class="modal-form-group">
+          <label>Điểm Toán</label>
+          <input 
+            type="number" 
+            step="0.1" 
+            min="0" 
+            max="10"
+            id="modal_grade_math"
+            placeholder="Chưa có điểm"
+          />
+        </div>
+
+        <div class="modal-form-group">
+          <label>Điểm Ngữ Văn</label>
+          <input 
+            type="number" 
+            step="0.1" 
+            min="0" 
+            max="10"
+            id="modal_grade_literature"
+            placeholder="Chưa có điểm"
+          />
+        </div>
+
+        <div class="modal-form-group">
+          <label>Điểm Tiếng Anh</label>
+          <input 
+            type="number" 
+            step="0.1" 
+            min="0" 
+            max="10"
+            id="modal_grade_english"
+            placeholder="Chưa có điểm"
+          />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn_cancel_grade_modal">Hủy</button>
+        <button type="submit" class="btn btn-primary">Cập Nhật Điểm</button>
+      </div>
+    </form>
+  </div>
+</div>

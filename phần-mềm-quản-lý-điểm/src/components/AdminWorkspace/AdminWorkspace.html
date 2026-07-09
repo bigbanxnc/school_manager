@@ -1,0 +1,246 @@
+<!-- Sidebar Layout of Admin Workspace -->
+<aside class="dashboard-sidebar" id="admin_sidebar_menu">
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">Phân hệ Quản trị</div>
+    
+    <button class="sidebar-btn" id="admin_menu_members">
+      👥 Tất Cả Thành Viên
+    </button>
+
+    <button class="sidebar-btn" id="admin_menu_classes">
+      📚 Quản Lý Lớp Học
+    </button>
+
+    <button class="sidebar-btn" id="admin_menu_teachers">
+      💼 Quản Lý Giáo Viên
+    </button>
+
+    <button class="sidebar-btn" id="admin_menu_students_grades">
+      📊 Quản Lý Điểm Số
+    </button>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">Tiện ích</div>
+    <button class="sidebar-btn" id="admin_menu_export">
+      📥 Xuất CSV Bảng Điểm
+    </button>
+  </div>
+</aside>
+
+<!-- Main content area -->
+<main class="workspace-content" id="admin_workspace_content">
+  
+  <div class="workspace-header">
+    <div>
+      <h1 id="admin_title_lbl">Hệ Thống Quản Trị Hệ Thống</h1>
+      <p style="color: #8E8E85; font-size: 0.85rem; margin-top: 4px; font-family: sans-serif;">
+        Chào mừng, <strong id="admin_name_lbl">Quản trị viên</strong>. Bạn đang kiểm soát toàn quyền điểm số học sinh, giáo viên và lớp học.
+      </p>
+    </div>
+    <div class="header-actions">
+      <!-- Dyn action buttons -->
+      <button class="btn btn-primary" id="admin_btn_add_action" style="display: none;">
+        + Thêm Mới
+      </button>
+      <button class="btn btn-success" id="admin_btn_export_csv">
+        📥 Xuất Toàn Bộ Điểm (CSV)
+      </button>
+    </div>
+  </div>
+
+  <!-- Search wrapper -->
+  <div class="search-filter-strip">
+    <div class="search-wrapper">
+      <span class="search-icon">🔍</span>
+      <input 
+        type="text" 
+        placeholder="Tìm kiếm không dấu/có dấu: mã số, tên, gmail, điểm số..." 
+        id="admin_search_input"
+      />
+    </div>
+    <button class="btn btn-secondary btn-sm" id="btn_clear_admin_search" style="display: none;">
+      Xóa lọc ✕
+    </button>
+  </div>
+
+  <!-- Dynamic datatable displays for Teachers, Student Grades, Classes, or Members -->
+  <div class="data-table-container" id="admin_dynamic_table_container">
+    <table class="data-table" id="admin_core_data_table">
+      <!-- Generated via JS -->
+    </table>
+    <div class="table-footer" id="admin_table_footer">
+      <!-- Generated info -->
+    </div>
+  </div>
+
+</main>
+
+<!-- MODALS DIALOGS -->
+
+<!-- TEACHER DIALOG -->
+<div class="modal-backdrop" id="admin_teacher_modal" style="display: none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="teacher_modal_title">Đăng Ký Giáo Viên Mới</h3>
+      <button class="btn-close-modal" id="btn_close_teacher_modal">✕</button>
+    </div>
+    <form id="form_save_teacher">
+      <div class="modal-body">
+        <div class="modal-form-group">
+          <label>Mã Giáo Viên (ID)</label>
+          <input type="text" id="teacher_modal_id" required />
+        </div>
+        <div class="modal-form-group">
+          <label>Họ và Tên Giáo Viên</label>
+          <input type="text" id="teacher_modal_name" placeholder="Nguyễn Văn Toán" required />
+        </div>
+        <div class="modal-form-group">
+          <label>Gmail Đăng Nhập</label>
+          <input type="email" id="teacher_modal_email" placeholder="vi_du@gmail.com" required />
+        </div>
+        <div class="modal-form-group">
+          <label>Mật Khẩu</label>
+          <input type="text" id="teacher_modal_password" required />
+        </div>
+        <div class="modal-form-group">
+          <label>Phân công lớp giảng dạy</label>
+          <div class="checkbox-grid" id="teacher_modal_classes_checkbox_grid">
+            <!-- Classes checkboxes -->
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn_cancel_teacher_modal">Hủy</button>
+        <button type="submit" class="btn btn-primary">Xác Nhận Lưu</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- STUDENT DIALOG -->
+<div class="modal-backdrop" id="admin_student_modal" style="display: none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="student_modal_title">Đăng Ký Học Sinh Mới</h3>
+      <button class="btn-close-modal" id="btn_close_student_modal">✕</button>
+    </div>
+    <form id="form_save_student">
+      <div class="modal-body">
+        <div class="modal-form-group">
+          <label>Mã Học Sinh (ID)</label>
+          <input type="text" id="student_modal_id" required />
+        </div>
+        <div class="modal-form-group">
+          <label>Họ và Tên Học Sinh</label>
+          <input type="text" id="student_modal_name" placeholder="Lê Hoàng Nam" required />
+        </div>
+        <div class="modal-form-group">
+          <label>Gmail Đăng Nhập</label>
+          <input type="email" id="student_modal_email" placeholder="nam@gmail.com" required />
+        </div>
+        <div class="modal-form-group">
+          <label>Mật Khẩu</label>
+          <input type="text" id="student_modal_password" required />
+        </div>
+        <div class="modal-form-group">
+          <label>Xếp Vào Lớp</label>
+          <select id="student_modal_classname" required>
+            <!-- Class selections -->
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn_cancel_student_modal">Hủy</button>
+        <button type="submit" class="btn btn-primary">Xác Nhận Lưu</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- STUDENT GRADE DIALOG -->
+<div class="modal-backdrop" id="admin_grade_modal" style="display: none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="grade_modal_title">Nhập & Sửa Điểm</h3>
+      <button class="btn-close-modal" id="btn_close_grade_modal">✕</button>
+    </div>
+    <form id="form_save_student_grades">
+      <div class="modal-body">
+        <p style="font-size: 0.8rem; color: #8E8E85; margin-bottom: 16px; font-family: sans-serif;">
+          Hệ số điểm từ 0.0 đến 10.0. Để trống ô nhập nếu muốn chuyển điểm về trạng thái "Chưa có".
+        </p>
+        <div class="modal-form-group">
+          <label>Điểm Toán</label>
+          <input type="number" step="0.1" min="0" max="10" id="grade_modal_math" placeholder="Chưa có điểm" />
+        </div>
+        <div class="modal-form-group">
+          <label>Điểm Ngữ Văn</label>
+          <input type="number" step="0.1" min="0" max="10" id="grade_modal_literature" placeholder="Chưa có điểm" />
+        </div>
+        <div class="modal-form-group">
+          <label>Điểm Tiếng Anh</label>
+          <input type="number" step="0.1" min="0" max="10" id="grade_modal_english" placeholder="Chưa có điểm" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn_cancel_grade_modal">Hủy</button>
+        <button type="submit" class="btn btn-primary">Cập Nhật Điểm</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- CLASS DIALOG -->
+<div class="modal-backdrop" id="admin_class_modal" style="display: none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>Đăng Ký Thêm Lớp Mới</h3>
+      <button class="btn-close-modal" id="btn_close_class_modal">✕</button>
+    </div>
+    <form id="form_save_class">
+      <div class="modal-body">
+        <div class="error-alert" id="class_modal_error" style="display: none;"></div>
+        <div class="modal-form-group">
+          <label>Mã Lớp Học (Ví dụ: 12A3, 10C5)</label>
+          <input type="text" id="class_modal_id" placeholder="Mã viết liền không dấu" required />
+        </div>
+        <div class="modal-form-group">
+          <label>Tên Lớp Học Chi Tiết</label>
+          <input type="text" id="class_modal_name" placeholder="Ví dụ: Lớp chuyên tự nhiên 12A3" required />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn_cancel_class_modal">Hủy</button>
+        <button type="submit" class="btn btn-primary">Đăng Ký Lớp</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ENROLL MEMBER DIALOG -->
+<div class="modal-backdrop" id="admin_enroll_modal" style="display: none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>Ghi Danh Vào Lớp Học</h3>
+      <button class="btn-close-modal" id="btn_close_enroll_modal">✕</button>
+    </div>
+    <form id="form_save_enroll">
+      <div class="modal-body">
+        <p style="margin-bottom: 16px; font-size: 0.9rem;" id="enroll_modal_description">
+          Ghi danh thành viên vào lớp học sau:
+        </p>
+        <div class="modal-form-group">
+          <label>Lớp học chỉ định</label>
+          <select id="enroll_modal_classname" required>
+            <!-- Classes listings -->
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn_cancel_enroll_modal">Hủy</button>
+        <button type="submit" class="btn btn-primary">Xác Nhận Ghi Danh</button>
+      </div>
+    </form>
+  </div>
+</div>

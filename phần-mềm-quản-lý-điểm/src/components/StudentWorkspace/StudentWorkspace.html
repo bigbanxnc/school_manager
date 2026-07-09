@@ -1,0 +1,46 @@
+<main class="workspace-content" style="flex: 1; padding: 30px;" id="student_workspace_content">
+  <div class="student-welcome">
+    <div class="profile-wrapper">
+      <div class="student-avatar">🎓</div>
+      <div class="student-meta">
+        <h2>Xin chào, <span id="lbl_student_name">Học sinh</span>!</h2>
+        <p>Mã học sinh: <strong id="lbl_student_id">HS001</strong> | Lớp học: <strong id="lbl_class_name">10A1</strong></p>
+        <p style="font-size: 0.8rem; color: #8E8E85; margin-top: 4px;">
+          Học sinh chỉ có quyền xem điểm chính mình, không thể tự ý chỉnh sửa hay xem điểm lớp khác.
+        </p>
+      </div>
+    </div>
+    <button class="btn btn-success" id="student_btn_export">
+      📥 Xuất CSV Điểm Cá Nhân
+    </button>
+  </div>
+
+  <!-- Subject Grades Cards Grid -->
+  <div class="subject-grades-grid">
+    <div class="subject-grade-card">
+      <h4>Toán Học</h4>
+      <div class="grade-number" id="lbl_grade_math">Chưa có điểm</div>
+    </div>
+
+    <div class="subject-grade-card">
+      <h4>Ngữ Văn</h4>
+      <div class="grade-number" id="lbl_grade_literature">Chưa có điểm</div>
+    </div>
+
+    <div class="subject-grade-card">
+      <h4>Tiếng Anh</h4>
+      <div class="grade-number" id="lbl_grade_english">Chưa có điểm</div>
+    </div>
+  </div>
+
+  <!-- GPA & Academic Evaluation summary -->
+  <div class="gpa-summary-box">
+    <div class="gpa-label-box">
+      <span class="gpa-title">Điểm Trung Bình (GPA):</span>
+      <span class="gpa-score" id="lbl_gpa_score">N/A</span>
+    </div>
+    <div class="academic-eval">
+      Học lực học kỳ: <span id="lbl_academic_evaluation" class="pending">Chưa đánh giá</span>
+    </div>
+  </div>
+</main>
