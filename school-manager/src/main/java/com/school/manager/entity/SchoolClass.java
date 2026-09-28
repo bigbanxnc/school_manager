@@ -1,36 +1,46 @@
 package com.school.manager.entity;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.domain.Persistable;
 
 @Entity
-@Table(name = "school_classes")
+@Table(name = "school_classes", indexes = {
+        @Index(name = "idx_class_code", columnList = "code", unique = true)
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SchoolClass implements Persistable<String> {
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class SchoolClass {
     @Id
-    @Column(length = 50)
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "code", length = 50, unique = true, nullable = false)
+    @JsonAlias({"id", "code"})
+    private String code;
+
+    @Column(name = "name", nullable = false)
     private String name;
 
-    @Transient
-    @Builder.Default
-    private boolean isNew = true;
-
-    @Override
-    public boolean isNew() {
-        return isNew;
-    }
-
-    @PostPersist
-    @PostLoad
-    public void markNotNew() {
-        this.isNew = false;
+    @com.fasterxml.jackson.annotation.JsonSetter("id")
+    public void deserializeId(Object val) {
+        if (val instanceof Number num) {
+            this.id = num.longValue();
+        } else if (val instanceof String s) {
+            try {
+                this.id = Long.parseLong(s.trim());
+            } catch (NumberFormatException ignored) {
+                if (this.code == null || this.code.trim().isEmpty()) {
+                    this.code = s.trim();
+                }
+            }
+        }
     }
 }

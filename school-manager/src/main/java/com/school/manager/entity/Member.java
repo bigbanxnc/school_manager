@@ -1,54 +1,107 @@
 package com.school.manager.entity;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.domain.Persistable;
 
 import java.util.List;
 
 @Entity
-@Table(name = "members")
+@Table(name = "members", indexes = {
+        @Index(name = "idx_member_code", columnList = "code", unique = true)
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Member implements Persistable<String> {
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class Member {
     @Id
-    @Column(length = 50)
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "code", length = 50, unique = true, nullable = false)
+    @JsonAlias({"id", "code"})
+    private String code;
+
     private String name;
     private String email;
+
+    @Column(name = "password", nullable = false)
     private String password;
+
     private String role;
 
+    @Column(name = "must_change_password", nullable = false)
+    @Builder.Default
+    private Boolean mustChangePassword = false;
 
     @Column(name = "class_name", length = 50)
     private String className;
+
     private String subject;
 
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(
-            name = "member_assigned_classes",
-            joinColumns = @JoinColumn(name = "member_id", columnDefinition = "VARCHAR(50)")
-    )
-    @Column(name = "class_id", columnDefinition = "VARCHAR(50)")
-    private List<String> assignedClasses;
-
-    @Transient
-    @Builder.Default
-    private boolean isNew = true;
-
-    @Override
-    public boolean isNew() {
-        return isNew;
+    @com.fasterxml.jackson.annotation.JsonSetter("id")
+    public void deserializeId(Object val) {
+        if (val instanceof Number num) {
+            this.id = num.longValue();
+        } else if (val instanceof String s) {
+            try {
+                this.id = Long.parseLong(s.trim());
+            } catch (NumberFormatException ignored) {
+                if (this.code == null || this.code.trim().isEmpty()) {
+                    this.code = s.trim();
+                }
+            }
+        }
     }
 
-    @PostPersist
-    @PostLoad
-    public void markNotNew() {
-        this.isNew = false;
+    @ElementCollection
+    @org.hibernate.annotations.BatchSize(size = 50)
+    @CollectionTable(
+            name = "member_assigned_classes",
+            joinColumns = @JoinColumn(name = "member_id", referencedColumnName = "id")
+    )
+    @Column(name = "class_id", length = 50)
+    @Builder.Default
+    private List<String> assignedClasses = new java.util.ArrayList<>();
+
+    public List<String> getAssignedClasses() {
+        return assignedClasses != null ? assignedClasses : new java.util.ArrayList<>();
+    }
+
+    @PrePersist
+    @PreUpdate
+    public void ensureNonNullFields() {
+        if (this.mustChangePassword == null) {
+            this.mustChangePassword = false;
+        }
+        if (this.code == null || this.code.trim().isEmpty()) {
+            String prefix = "student".equalsIgnoreCase(this.role) ? "HS" : ("teacher".equalsIgnoreCase(this.role) ? "GV" : "AD");
+            this.code = prefix + (System.currentTimeMillis() % 100000);
+        }
+        if (this.email == null || this.email.trim().isEmpty()) {
+            this.email = this.code.toLowerCase() + "@school.com";
+        }
+        if (this.role == null || this.role.trim().isEmpty()) {
+            this.role = "student";
+        }
+        if (this.password == null || this.password.trim().isEmpty()) {
+            if ("admin".equalsIgnoreCase(this.role)) {
+                this.password = "admin123";
+            } else if ("teacher".equalsIgnoreCase(this.role)) {
+                this.password = "teacher123";
+            } else {
+                this.password = "hs123";
+            }
+        }
+        this.password = com.school.manager.util.PasswordUtil.ensureSha1(this.password);
+        if (this.name == null || this.name.trim().isEmpty()) {
+            this.name = "Thành viên " + this.code;
+        }
     }
 }

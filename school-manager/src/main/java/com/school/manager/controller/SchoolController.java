@@ -1,130 +1,87 @@
 package com.school.manager.controller;
 
-import com.school.manager.dto.*;
+import com.school.manager.dto.ChangePasswordRequestDto;
+import com.school.manager.dto.GradeDto;
+import com.school.manager.dto.LoginRequestDto;
+import com.school.manager.dto.MemberDto;
+import com.school.manager.dto.SchoolClassDto;
+import com.school.manager.exception.GlobalExceptionHandler.AppException;
 import com.school.manager.service.SchoolService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
 public class SchoolController {
 
-    @Autowired
-    private SchoolService schoolService;
+    private final SchoolService schoolService;
 
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequestDto credentials) {
-        try {
-            MemberDto loggedInUser = schoolService.login(credentials);
-            return ResponseEntity.ok(loggedInUser);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", e.getMessage()));
-        }
+    @PostMapping({"/login", "/auth/login"})
+    public ResponseEntity<MemberDto> login(@Valid @RequestBody LoginRequestDto credentials) {
+        return ResponseEntity.ok(schoolService.login(credentials));
+    }
+
+    @PostMapping({"/admin/users/{id}/reset-password", "/members/{id}/reset-password"})
+    public ResponseEntity<com.school.manager.dto.ResetPasswordResponseDto> resetPassword(
+            @PathVariable("id") String id,
+            @RequestHeader(value = "X-Current-User-Role", required = false) String currentUserRole) {
+        return ResponseEntity.ok(schoolService.resetPasswordByAdmin(id, currentUserRole));
+    }
+
+    @PostMapping({"/auth/force-change-password", "/force-change-password"})
+    public ResponseEntity<MemberDto> forceChangePassword(
+            @Valid @RequestBody com.school.manager.dto.ForceChangePasswordRequestDto request,
+            @RequestHeader(value = "X-Current-User-Email", required = false) String currentUserEmail) {
+        return ResponseEntity.ok(schoolService.forceChangePassword(request, currentUserEmail));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<Map<String, Object>> changePassword(
+            @Valid @RequestBody ChangePasswordRequestDto request,
+            @RequestHeader(value = "X-Current-User-Email", required = false) String currentUserEmail) {
+        schoolService.changePassword(request, currentUserEmail);
+        return ResponseEntity.ok(Map.of("message", "Đổi mật khẩu thành công.", "success", true));
     }
 
     @GetMapping("/members")
     public ResponseEntity<?> getAllMembers(
-            @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) String role,
-            @RequestParam(required = false) String search) {
+            @RequestParam(value = "page", defaultValue = "1") Integer page,
+            @RequestParam(value = "size", defaultValue = "10") Integer size,
+            @RequestParam(value = "role", required = false) String role,
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(value = "classes", required = false) String classes,
+            @RequestParam(value = "currentUserId", required = false) String currentUserId) {
+        return ResponseEntity.ok(schoolService.getMembersResponse(page, size, role, search, classes, currentUserId));
+    }
 
-        List<MemberDto> list = schoolService.getAllMembers();
+    @GetMapping("/members/{id}")
+    public ResponseEntity<MemberDto> getMemberById(@PathVariable("id") String id) {
+        return ResponseEntity.ok(schoolService.getMemberById(id));
+    }
 
-        if (role != null && !role.trim().isEmpty()) {
-            list = list.stream()
-                    .filter(m -> role.equalsIgnoreCase(m.getRole()))
-                    .collect(Collectors.toList());
-        }
-
-        if (search != null && !search.trim().isEmpty()) {
-            String q = search.trim().toLowerCase();
-            list = list.stream()
-                    .filter(m -> (m.getId() != null && m.getId().toLowerCase().contains(q))
-                            || (m.getName() != null && m.getName().toLowerCase().contains(q))
-                            || (m.getEmail() != null && m.getEmail().toLowerCase().contains(q)))
-                    .collect(Collectors.toList());
-        }
-
-        if (page != null) {
-            int p = page;
-            int s = (size != null) ? size : 10;
-            int totalElements = list.size();
-            int totalPages = (int) Math.ceil((double) totalElements / s);
-            if (totalPages == 0) totalPages = 1;
-
-            int fromIndex = (p - 1) * s;
-            int toIndex = Math.min(fromIndex + s, totalElements);
-
-            List<MemberDto> content = new ArrayList<>();
-            if (fromIndex >= 0 && fromIndex < totalElements) {
-                content = list.subList(fromIndex, toIndex);
-            }
-
-            return ResponseEntity.ok(Map.of(
-                    "content", content,
-                    "totalElements", totalElements,
-                    "totalPages", totalPages,
-                    "page", p,
-                    "size", s
-            ));
-        }
-
-        return ResponseEntity.ok(list);
+    @GetMapping("/next-id")
+    public ResponseEntity<Map<String, String>> getNextId(@RequestParam(value = "role", defaultValue = "student") String role) {
+        String nextId = schoolService.getNextId(role);
+        return ResponseEntity.ok(Map.of("nextId", nextId));
     }
 
     @GetMapping("/teachers")
     public ResponseEntity<?> getAllTeachers(
-            @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) String search) {
+            @RequestParam(value = "page", defaultValue = "1") Integer page,
+            @RequestParam(value = "size", defaultValue = "10") Integer size,
+            @RequestParam(value = "search", required = false) String search) {
+        return ResponseEntity.ok(schoolService.getTeachersResponse(page, size, search));
+    }
 
-        List<MemberDto> list = schoolService.getAllMembers().stream()
-                .filter(m -> "teacher".equalsIgnoreCase(m.getRole()))
-                .collect(Collectors.toList());
-
-        if (search != null && !search.trim().isEmpty()) {
-            String q = search.trim().toLowerCase();
-            list = list.stream()
-                    .filter(m -> (m.getId() != null && m.getId().toLowerCase().contains(q))
-                            || (m.getName() != null && m.getName().toLowerCase().contains(q))
-                            || (m.getEmail() != null && m.getEmail().toLowerCase().contains(q)))
-                    .collect(Collectors.toList());
-        }
-
-        if (page != null) {
-            int p = page;
-            int s = (size != null) ? size : 10;
-            int totalElements = list.size();
-            int totalPages = (int) Math.ceil((double) totalElements / s);
-            if (totalPages == 0) totalPages = 1;
-
-            int fromIndex = (p - 1) * s;
-            int toIndex = Math.min(fromIndex + s, totalElements);
-
-            List<MemberDto> content = new ArrayList<>();
-            if (fromIndex >= 0 && fromIndex < totalElements) {
-                content = list.subList(fromIndex, toIndex);
-            }
-
-            return ResponseEntity.ok(Map.of(
-                    "content", content,
-                    "totalElements", totalElements,
-                    "totalPages", totalPages,
-                    "page", p,
-                    "size", s
-            ));
-        }
-
-        return ResponseEntity.ok(list);
+    @GetMapping("/teachers/{id}")
+    public ResponseEntity<MemberDto> getTeacherById(@PathVariable("id") String id) {
+        return ResponseEntity.ok(schoolService.getTeacherById(id));
     }
 
     @PostMapping("/teachers")
@@ -133,24 +90,19 @@ public class SchoolController {
     }
 
     @PutMapping("/teachers/{id}")
-    public ResponseEntity<?> updateTeacher(@PathVariable String id, @RequestBody MemberDto teacherDto) {
-        try {
-            return ResponseEntity.ok(schoolService.updateTeacher(id, teacherDto));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", e.getMessage()));
-        }
+    public ResponseEntity<MemberDto> updateTeacher(@PathVariable("id") String id, @RequestBody MemberDto teacherDto) {
+        return ResponseEntity.ok(schoolService.updateTeacher(id, teacherDto));
     }
 
     @DeleteMapping("/teachers/{id}")
-    public ResponseEntity<?> deleteTeacher(@PathVariable String id) {
-        try {
-            schoolService.deleteTeacher(id);
-            return ResponseEntity.ok(Map.of("message", "Đã xóa giáo viên thành công."));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", e.getMessage()));
-        }
+    public ResponseEntity<Map<String, String>> deleteTeacher(@PathVariable("id") String id) {
+        schoolService.deleteTeacher(id);
+        return ResponseEntity.ok(Map.of("message", "Đã xóa giáo viên thành công."));
+    }
+
+    @GetMapping("/students/{id}")
+    public ResponseEntity<MemberDto> getStudentById(@PathVariable("id") String id) {
+        return ResponseEntity.ok(schoolService.getStudentById(id));
     }
 
     @PostMapping("/students")
@@ -159,24 +111,14 @@ public class SchoolController {
     }
 
     @PutMapping("/students/{id}")
-    public ResponseEntity<?> updateStudent(@PathVariable String id, @RequestBody MemberDto studentDto) {
-        try {
-            return ResponseEntity.ok(schoolService.updateStudent(id, studentDto));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", e.getMessage()));
-        }
+    public ResponseEntity<MemberDto> updateStudent(@PathVariable("id") String id, @RequestBody MemberDto studentDto) {
+        return ResponseEntity.ok(schoolService.updateStudent(id, studentDto));
     }
 
     @DeleteMapping("/students/{id}")
-    public ResponseEntity<?> deleteStudent(@PathVariable String id) {
-        try {
-            schoolService.deleteStudent(id);
-            return ResponseEntity.ok(Map.of("message", "Đã xóa học sinh và điểm số liên quan thành công."));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", e.getMessage()));
-        }
+    public ResponseEntity<Map<String, String>> deleteStudent(@PathVariable("id") String id) {
+        schoolService.deleteStudent(id);
+        return ResponseEntity.ok(Map.of("message", "Đã xóa học sinh và điểm số liên quan thành công."));
     }
 
     @GetMapping("/classes")
@@ -184,194 +126,108 @@ public class SchoolController {
         return ResponseEntity.ok(schoolService.getAllClasses());
     }
 
+    @GetMapping("/classes/{id}")
+    public ResponseEntity<SchoolClassDto> getClassById(@PathVariable("id") String id) {
+        return ResponseEntity.ok(schoolService.getClassById(id));
+    }
+
     @PostMapping("/classes")
-    public ResponseEntity<?> createClass(@RequestBody SchoolClassDto classDto) {
-        try {
-            SchoolClassDto createdClass = schoolService.createClass(classDto);
-            return ResponseEntity.ok(createdClass);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
-        }
+    public ResponseEntity<SchoolClassDto> createClass(@RequestBody SchoolClassDto classDto) {
+        return ResponseEntity.ok(schoolService.createClass(classDto));
     }
 
     @DeleteMapping("/classes/{id}")
-    public ResponseEntity<?> deleteClass(@PathVariable String id) {
-        try {
-            schoolService.deleteClass(id);
-            return ResponseEntity.ok(Map.of("message", "Đã xóa lớp học thành công."));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", e.getMessage()));
-        }
+    public ResponseEntity<Map<String, String>> deleteClass(@PathVariable("id") String id) {
+        schoolService.deleteClass(id);
+        return ResponseEntity.ok(Map.of("message", "Đã xóa lớp học thành công."));
     }
 
     @PostMapping("/enroll/student")
-    public ResponseEntity<?> enrollStudent(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<MemberDto> enrollStudent(@RequestBody Map<String, String> payload) {
         String id = payload.get("id");
         String className = payload.get("className");
-        try {
-            return ResponseEntity.ok(schoolService.enrollStudent(id, className));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
-        }
+        return ResponseEntity.ok(schoolService.enrollStudent(id, className));
     }
 
     @PostMapping("/enroll/teacher")
-    public ResponseEntity<?> enrollTeacher(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<MemberDto> enrollTeacher(@RequestBody Map<String, String> payload) {
         String id = payload.get("id");
         String className = payload.get("className");
-        try {
-            return ResponseEntity.ok(schoolService.enrollTeacherClass(id, className));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
-        }
+        return ResponseEntity.ok(schoolService.enrollTeacherClass(id, className));
+    }
+
+    @PostMapping("/unenroll/student")
+    public ResponseEntity<MemberDto> unenrollStudent(@RequestBody Map<String, String> payload) {
+        String id = payload.get("id");
+        return ResponseEntity.ok(schoolService.enrollStudent(id, null));
     }
 
     @PostMapping("/unenroll/teacher")
-    public ResponseEntity<?> unenrollTeacher(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<MemberDto> unenrollTeacher(@RequestBody Map<String, String> payload) {
         String id = payload.get("id");
         String className = payload.get("className");
-        try {
-            return ResponseEntity.ok(schoolService.unenrollTeacherClass(id, className));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
-        }
+        return ResponseEntity.ok(schoolService.unenrollTeacherClass(id, className));
+    }
+
+    @PostMapping("/teachers/auto-assign")
+    public ResponseEntity<List<MemberDto>> autoAssignTeachers() {
+        return ResponseEntity.ok(schoolService.autoAssignTeachers());
+    }
+
+    @PostMapping("/teachers/{id}/auto-assign")
+    public ResponseEntity<MemberDto> autoAssignSingleTeacher(@PathVariable("id") String id) {
+        return ResponseEntity.ok(schoolService.autoAssignSingleTeacher(id));
     }
 
     @GetMapping("/grades")
     public ResponseEntity<?> getAllGrades(
-            @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) String search) {
-
-        List<GradeDto> rawGrades = schoolService.getAllGrades();
-
-        if (page == null) {
-            return ResponseEntity.ok(rawGrades);
-        }
-
-        List<MemberDto> students = schoolService.getMembersByRole("student");
-        List<Map<String, Object>> records = new ArrayList<>();
-
-        for (MemberDto s : students) {
-            GradeDto g = rawGrades.stream()
-                    .filter(grade -> s.getId().equalsIgnoreCase(grade.getStudentId()))
-                    .findFirst()
-                    .orElse(null);
-
-            records.add(buildStudentGradeRecord(s, g));
-        }
-
-        if (search != null && !search.trim().isEmpty()) {
-            String q = search.trim().toLowerCase();
-            records = records.stream()
-                    .filter(r -> {
-                        String studentId = (String) r.get("studentId");
-                        String studentName = (String) r.get("studentName");
-                        String className = (String) r.get("className");
-                        String email = (String) r.get("email");
-                        Double math = (Double) r.get("math");
-                        Double literature = (Double) r.get("literature");
-                        Double english = (Double) r.get("english");
-                        Double gpa = (Double) r.get("gpa");
-
-                        return (studentId != null && studentId.toLowerCase().contains(q))
-                                || (studentName != null && studentName.toLowerCase().contains(q))
-                                || (className != null && className.toLowerCase().contains(q))
-                                || (email != null && email.toLowerCase().contains(q))
-                                || (math != null && String.valueOf(math).contains(q))
-                                || (literature != null && String.valueOf(literature).contains(q))
-                                || (english != null && String.valueOf(english).contains(q))
-                                || (gpa != null && String.valueOf(gpa).contains(q));
-                    })
-                    .collect(Collectors.toList());
-        }
-
-        int p = page;
-        int s = (size != null) ? size : 10;
-        int totalElements = records.size();
-        int totalPages = (int) Math.ceil((double) totalElements / s);
-        if (totalPages == 0) totalPages = 1;
-
-        int fromIndex = (p - 1) * s;
-        int toIndex = Math.min(fromIndex + s, totalElements);
-
-        List<Map<String, Object>> content = new ArrayList<>();
-        if (fromIndex >= 0 && fromIndex < totalElements) {
-            content = records.subList(fromIndex, toIndex);
-        }
-
-        return ResponseEntity.ok(Map.of(
-                "content", content,
-                "totalElements", totalElements,
-                "totalPages", totalPages,
-                "page", p,
-                "size", s
-        ));
+            @RequestParam(value = "page", defaultValue = "1") Integer page,
+            @RequestParam(value = "size", defaultValue = "10") Integer size,
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(value = "classes", required = false) String classes,
+            @RequestParam(value = "currentUserId", required = false) String currentUserId,
+            @RequestParam(value = "scoreSubject", required = false) String scoreSubject,
+            @RequestParam(value = "scoreOp", required = false) String scoreOp,
+            @RequestParam(value = "scoreVal", required = false) Double scoreVal) {
+        return ResponseEntity.ok(schoolService.getGradesResponse(page, size, search, classes, currentUserId, scoreSubject, scoreOp, scoreVal));
     }
 
-    private Map<String, Object> buildStudentGradeRecord(MemberDto student, GradeDto grade) {
-        Double math = (grade != null) ? grade.getMath() : null;
-        Double literature = (grade != null) ? grade.getLiterature() : null;
-        Double english = (grade != null) ? grade.getEnglish() : null;
-
-        Double gpa = null;
-        int count = 0;
-        double sum = 0.0;
-        if (math != null) { sum += math; count++; }
-        if (literature != null) { sum += literature; count++; }
-        if (english != null) { sum += english; count++; }
-        if (count > 0) {
-            gpa = Math.round((sum / count) * 100.0) / 100.0;
-        }
-
-        Map<String, Object> record = new java.util.HashMap<>();
-        record.put("studentId", student.getId());
-        record.put("studentName", student.getName());
-        record.put("className", (student.getClassName() != null) ? student.getClassName() : "Chưa xếp lớp");
-        record.put("email", student.getEmail());
-        record.put("math", math);
-        record.put("literature", literature);
-        record.put("english", english);
-        record.put("gpa", gpa);
-        return record;
+    @GetMapping("/grades/{studentId}")
+    public ResponseEntity<Map<String, Object>> getStudentGrade(
+            @PathVariable("studentId") String studentId,
+            @RequestParam(value = "currentUserId", required = false) String currentUserId) {
+        return ResponseEntity.ok(schoolService.getStudentGradeRecord(studentId, currentUserId));
     }
 
     @PutMapping("/grades/{studentId}")
-    public ResponseEntity<GradeDto> saveGrade(@PathVariable String studentId, @RequestBody GradeDto gradeDto) {
-        return ResponseEntity.ok(schoolService.saveGrade(studentId, gradeDto));
+    public ResponseEntity<Map<String, Object>> saveGrade(@PathVariable("studentId") String studentId, @RequestBody GradeDto gradeDto) {
+        return ResponseEntity.ok(schoolService.saveGradeRecord(studentId, gradeDto));
     }
 
     @DeleteMapping("/grades/{studentId}")
-    public ResponseEntity<?> deleteGrade(@PathVariable String studentId) {
-        try {
-            schoolService.deleteGrade(studentId);
-            return ResponseEntity.ok(Map.of("message", "Đã xóa trắng điểm số thành công."));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
-        }
+    public ResponseEntity<Map<String, String>> deleteGrade(@PathVariable("studentId") String studentId) {
+        schoolService.deleteGrade(studentId);
+        return ResponseEntity.ok(Map.of("message", "Đã xóa trắng điểm số thành công."));
     }
 
     @DeleteMapping("/grades/{studentId}/subject/{subject}")
-    public ResponseEntity<?> deleteSubjectGrade(@PathVariable String studentId, @PathVariable String subject) {
+    public ResponseEntity<Map<String, String>> deleteSubjectGrade(@PathVariable("studentId") String studentId, @PathVariable("subject") String subject) {
         schoolService.deleteSubjectGrade(studentId, subject);
         return ResponseEntity.ok(Map.of("message", "Đã xóa điểm môn học thành công."));
     }
 
     @GetMapping("/queries/grades/excellent/math")
-    public ResponseEntity<List<GradeDto>> getExcellentMathStudents(@RequestParam(defaultValue = "8.0") Double minScore) {
+    public ResponseEntity<List<GradeDto>> getExcellentMathStudents(@RequestParam(value = "minScore", defaultValue = "8.0") Double minScore) {
         return ResponseEntity.ok(schoolService.getExcellentMathStudents(minScore));
     }
 
     @GetMapping("/queries/grades/excellent/literature")
-    public ResponseEntity<List<GradeDto>> getExcellentLiteratureStudents(@RequestParam(defaultValue = "8.0") Double minScore) {
+    public ResponseEntity<List<GradeDto>> getExcellentLiteratureStudents(@RequestParam(value = "minScore", defaultValue = "8.0") Double minScore) {
         return ResponseEntity.ok(schoolService.getExcellentLiteratureStudents(minScore));
     }
 
     @GetMapping("/queries/grades/excellent/english")
-    public ResponseEntity<List<GradeDto>> getExcellentEnglishStudents(@RequestParam(defaultValue = "8.0") Double minScore) {
+    public ResponseEntity<List<GradeDto>> getExcellentEnglishStudents(@RequestParam(value = "minScore", defaultValue = "8.0") Double minScore) {
         return ResponseEntity.ok(schoolService.getExcellentEnglishStudents(minScore));
     }
 
@@ -381,41 +237,41 @@ public class SchoolController {
     }
 
     @GetMapping("/queries/members/role/{role}")
-    public ResponseEntity<List<MemberDto>> getMembersByRole(@PathVariable String role) {
+    public ResponseEntity<List<MemberDto>> getMembersByRole(@PathVariable("role") String role) {
         return ResponseEntity.ok(schoolService.getMembersByRole(role));
     }
 
     @GetMapping("/queries/members/role/{role}/class/{className}")
-    public ResponseEntity<List<MemberDto>> getMembersByRoleAndClassName(@PathVariable String role, @PathVariable String className) {
+    public ResponseEntity<List<MemberDto>> getMembersByRoleAndClassName(@PathVariable("role") String role, @PathVariable("className") String className) {
         return ResponseEntity.ok(schoolService.getMembersByRoleAndClassName(role, className));
     }
 
     @GetMapping("/queries/members/role/{role}/subject/{subject}")
-    public ResponseEntity<List<MemberDto>> getMembersByRoleAndSubject(@PathVariable String role, @PathVariable String subject) {
+    public ResponseEntity<List<MemberDto>> getMembersByRoleAndSubject(@PathVariable("role") String role, @PathVariable("subject") String subject) {
         return ResponseEntity.ok(schoolService.getMembersByRoleAndSubject(role, subject));
     }
 
     @GetMapping("/queries/members/teachers/class/{classId}")
-    public ResponseEntity<List<MemberDto>> getTeachersByClassId(@PathVariable String classId) {
+    public ResponseEntity<List<MemberDto>> getTeachersByClassId(@PathVariable("classId") String classId) {
         return ResponseEntity.ok(schoolService.getTeachersByClassId(classId));
     }
 
     @GetMapping("/queries/members/search")
-    public ResponseEntity<List<MemberDto>> searchMembersByName(@RequestParam String keyword) {
+    public ResponseEntity<List<MemberDto>> searchMembersByName(@RequestParam("keyword") String keyword) {
         return ResponseEntity.ok(schoolService.searchMembersByName(keyword));
     }
 
     @GetMapping("/queries/classes/by-name/{name}")
-    public ResponseEntity<SchoolClassDto> getClassByName(@PathVariable String name) {
+    public ResponseEntity<SchoolClassDto> getClassByName(@PathVariable("name") String name) {
         SchoolClassDto schoolClassDto = schoolService.getClassByName(name);
         if (schoolClassDto == null) {
-            return ResponseEntity.notFound().build();
+            throw AppException.notFound("Không tìm thấy lớp học với tên: " + name);
         }
         return ResponseEntity.ok(schoolClassDto);
     }
 
     @GetMapping("/queries/classes/exists/{name}")
-    public ResponseEntity<Map<String, Boolean>> existsClassByName(@PathVariable String name) {
+    public ResponseEntity<Map<String, Boolean>> existsClassByName(@PathVariable("name") String name) {
         boolean exists = schoolService.existsClassByName(name);
         return ResponseEntity.ok(Map.of("exists", exists));
     }

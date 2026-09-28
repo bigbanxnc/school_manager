@@ -2,40 +2,27 @@ package com.school.manager.mapper;
 
 import com.school.manager.dto.MemberDto;
 import com.school.manager.entity.Member;
-import org.springframework.stereotype.Component;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 
 import java.util.ArrayList;
+import java.util.List;
 
-@Component
-public class MemberMapper {
+@Mapper(componentModel = "spring")
+public interface MemberMapper {
 
-    public MemberDto toDto(Member entity) {
-        if (entity == null) return null;
+    @Mapping(target = "assignedClasses", source = "assignedClasses", qualifiedByName = "mapAssignedClasses")
+    MemberDto toDto(Member entity);
 
-        return MemberDto.builder()
-                .id(entity.getId())
-                .name(entity.getName())
-                .email(entity.getEmail())
-                .password(entity.getPassword())
-                .role(entity.getRole())
-                .className(entity.getClassName())
-                .subject(entity.getSubject())
-                .assignedClasses(entity.getAssignedClasses() != null ? new ArrayList<>(entity.getAssignedClasses()) : new ArrayList<>())
-                .build();
-    }
+    @Mapping(target = "assignedClasses", source = "assignedClasses", qualifiedByName = "mapAssignedClasses")
+    Member toEntity(MemberDto dto);
 
-    public Member toEntity(MemberDto dto) {
-        if (dto == null) return null;
-
-        return Member.builder()
-                .id(dto.getId())
-                .name(dto.getName())
-                .email(dto.getEmail())
-                .password(dto.getPassword())
-                .role(dto.getRole())
-                .className(dto.getClassName())
-                .subject(dto.getSubject())
-                .assignedClasses(dto.getAssignedClasses() != null ? new ArrayList<>(dto.getAssignedClasses()) : new ArrayList<>())
-                .build();
+    @Named("mapAssignedClasses")
+    @SuppressWarnings("unused")
+    default List<String> mapAssignedClasses(List<String> list) {
+        return list != null ? new ArrayList<>(list) : new ArrayList<>();
     }
 }
+
+

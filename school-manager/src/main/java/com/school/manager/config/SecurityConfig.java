@@ -36,11 +36,6 @@ public class SecurityConfig {
                     .formLogin(AbstractHttpConfigurer::disable)
                     .httpBasic(AbstractHttpConfigurer::disable)
 
-                    .authorizeHttpRequests(auth -> auth
-                            .requestMatchers("/api/**").permitAll()
-                            .requestMatchers("/h2-console/**").permitAll()
-                            .anyRequest().permitAll()
-                    )
 
                     .headers(headers -> headers
                             .frameOptions(HeadersConfigurer.FrameOptionsConfig::disable)
@@ -48,7 +43,7 @@ public class SecurityConfig {
 
             return http.build();
         } catch (Exception e) {
-            System.err.println("[SecurityConfig] LỖI NGHIÊM TRỌNG khi cấu hình HttpSecurity: " + e.getMessage());
+            System.err.println("[SecurityConfig] lỗi nghiêm trọng khi cấu hình HttpSecurity: " + e.getMessage());
             throw new RuntimeException("Lỗi khi cấu hình SecurityFilterChain", e);
         }
     }

@@ -25,7 +25,7 @@ export const getAcademicEvaluation = (gpa: number | null): { text: string; class
  * Triggers a download of student grade records as a CSV file.
  */
 export const handleExportCsv = (filename: string, records: StudentGradeRecord[]) => {
-  let csvContent = '\uFEFF'; // UTF-8 BOM for Excel Vietnamese characters support
+  let csvContent = '\uFEFF'; // UTF-8 BOM for CSV Vietnamese characters support
   csvContent += 'Mã Học Sinh,Tên Học Sinh,Lớp,Email,Điểm Toán,Điểm Văn,Điểm Anh,Điểm Trung Bình\r\n';
 
   records.forEach(row => {
@@ -46,3 +46,47 @@ export const handleExportCsv = (filename: string, records: StudentGradeRecord[])
   link.click();
   document.body.removeChild(link);
 };
+
+/**
+ * Sinh mật khẩu ngẫu nhiên sử dụng SecureRandom (crypto.getRandomValues)
+ * Độ dài đúng 10 ký tự.
+ * Đảm bảo luôn chứa tối thiểu: 1 chữ thường (a-z), 1 chữ hoa (A-Z), 1 chữ số (0-9).
+ */
+export const generateSecureRandomPassword = (length = 10): string => {
+  const lowercaseChars = 'abcdefghijklmnopqrstuvwxyz';
+  const uppercaseChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const digitChars = '0123456789';
+  const allChars = lowercaseChars + uppercaseChars + digitChars;
+
+  const getRandomInt = (max: number): number => {
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+      const buffer = new Uint32Array(1);
+      window.crypto.getRandomValues(buffer);
+      return buffer[0] % max;
+    }
+    return Math.floor(Math.random() * max);
+  };
+
+  // Đảm bảo luôn chứa tối thiểu 1 chữ thường (a-z), 1 chữ hoa (A-Z) và 1 chữ số (0-9)
+  const passwordChars: string[] = [
+    lowercaseChars[getRandomInt(lowercaseChars.length)],
+    uppercaseChars[getRandomInt(uppercaseChars.length)],
+    digitChars[getRandomInt(digitChars.length)]
+  ];
+
+  // Bổ sung các ký tự còn lại cho đủ độ dài đúng 10 ký tự
+  for (let i = passwordChars.length; i < length; i++) {
+    passwordChars.push(allChars[getRandomInt(allChars.length)]);
+  }
+
+  // Trộn đều ngẫu nhiên bảo mật cao (Fisher-Yates shuffle với CSPRNG)
+  for (let i = passwordChars.length - 1; i > 0; i--) {
+    const j = getRandomInt(i + 1);
+    const temp = passwordChars[i];
+    passwordChars[i] = passwordChars[j];
+    passwordChars[j] = temp;
+  }
+
+  return passwordChars.join('');
+};
+

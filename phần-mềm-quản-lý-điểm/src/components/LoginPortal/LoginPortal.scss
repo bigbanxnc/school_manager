@@ -155,3 +155,133 @@
     }
   }
 }
+
+// Toast notification tab - slides in from the right below the header divider line under "Chưa đăng nhập"
+.toast-notification-tab {
+  position: fixed;
+  top: 76px;
+  right: 24px;
+  left: auto;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: #FFFFFF;
+  border: 1px solid #B8E2BD;
+  border-left: 5px solid #2B6E32;
+  border-radius: 10px;
+  padding: 12px 18px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.12), 0 3px 8px rgba(43, 110, 50, 0.08);
+  max-width: calc(100% - 48px);
+  overflow: hidden;
+  box-sizing: border-box;
+  animation: toastSlideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+
+  &.is-leaving {
+    animation: toastSlideOutRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .toast-icon-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: #EAF5EA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    .toast-check-icon {
+      font-size: 1.1rem;
+      color: #2B6E32;
+      font-weight: 800;
+    }
+  }
+
+  .toast-content {
+    display: flex;
+    align-items: center;
+    text-align: left;
+
+    .toast-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #1E4620;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+  }
+
+  .toast-close-btn {
+    background: transparent;
+    border: none;
+    font-size: 1.1rem;
+    color: #8FA492;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    line-height: 1;
+    margin-left: 6px;
+    transition: all 0.15s;
+
+    &:hover {
+      color: #1E4620;
+      background-color: #F0F5F0;
+    }
+  }
+
+  .toast-progress-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #2B6E32, #48BB78);
+    width: 100%;
+    animation: toastProgress 2.4s linear forwards;
+  }
+}
+
+@keyframes toastSlideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(calc(100% + 40px));
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes toastSlideOutRight {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(calc(100% + 40px));
+  }
+}
+
+@keyframes toastProgress {
+  0% {
+    width: 100%;
+  }
+  100% {
+    width: 0%;
+  }
+}
+
+@media (max-width: 640px) {
+  .toast-notification-tab {
+    top: 72px;
+    right: 16px;
+    max-width: calc(100% - 32px);
+    padding: 10px 14px;
+
+    .toast-content .toast-title {
+      font-size: 0.88rem;
+    }
+  }
+}
