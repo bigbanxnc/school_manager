@@ -47,11 +47,7 @@ export const handleExportCsv = (filename: string, records: StudentGradeRecord[])
   document.body.removeChild(link);
 };
 
-/**
- * Sinh mật khẩu ngẫu nhiên sử dụng SecureRandom (crypto.getRandomValues)
- * Độ dài đúng 10 ký tự.
- * Đảm bảo luôn chứa tối thiểu: 1 chữ thường (a-z), 1 chữ hoa (A-Z), 1 chữ số (0-9).
- */
+
 export const generateSecureRandomPassword = (length = 10): string => {
   const lowercaseChars = 'abcdefghijklmnopqrstuvwxyz';
   const uppercaseChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';

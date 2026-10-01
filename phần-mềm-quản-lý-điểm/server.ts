@@ -491,52 +491,56 @@ app.use('/api', async (req, res, next) => {
       if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && response.status < 400) {
         try {
           const db = readDb();
-          const cleanPath = req.path;
+          const cleanPath = req.path.startsWith('/api') ? req.path.slice(4) : req.path;
           if (cleanPath.startsWith('/students')) {
-            if (req.method === 'POST' && data && data.id) {
-              const idx = db.members.findIndex((m: any) => (m.id || '').toLowerCase() === (data.id || '').toLowerCase());
+            const memberId = data?.code || (data?.id !== undefined ? String(data.id) : undefined);
+            const normalizedMember = data ? { ...data, id: memberId || data.id, code: memberId || data.code } : null;
+            if (req.method === 'POST' && normalizedMember && normalizedMember.id) {
+              const idx = db.members.findIndex((m: any) => (m.id || '').toLowerCase() === (normalizedMember.id || '').toLowerCase() || (m.code || '').toLowerCase() === (normalizedMember.id || '').toLowerCase());
               if (idx !== -1) {
-                db.members[idx] = { ...db.members[idx], ...data };
+                db.members[idx] = { ...db.members[idx], ...normalizedMember };
               } else {
-                db.members.push(data);
+                db.members.push(normalizedMember);
               }
-              if (!db.grades.some((g: any) => (g.studentId || '').toLowerCase() === (data.id || '').toLowerCase())) {
-                db.grades.push({ studentId: data.id, math: null, literature: null, english: null });
+              if (!db.grades.some((g: any) => (g.studentId || '').toLowerCase() === (normalizedMember.id || '').toLowerCase())) {
+                db.grades.push({ studentId: normalizedMember.id, math: null, literature: null, english: null });
               }
               writeDb(db);
-            } else if (req.method === 'PUT' && data && data.id) {
-              const idx = db.members.findIndex((m: any) => (m.id || '').toLowerCase() === (data.id || '').toLowerCase());
+            } else if (req.method === 'PUT' && normalizedMember && normalizedMember.id) {
+              const idx = db.members.findIndex((m: any) => (m.id || '').toLowerCase() === (normalizedMember.id || '').toLowerCase() || (m.code || '').toLowerCase() === (normalizedMember.id || '').toLowerCase());
               if (idx !== -1) {
-                db.members[idx] = { ...db.members[idx], ...data };
+                db.members[idx] = { ...db.members[idx], ...normalizedMember };
                 writeDb(db);
               }
             } else if (req.method === 'DELETE') {
               const targetId = cleanPath.split('/')[2];
               if (targetId) {
-                db.members = db.members.filter((m: any) => (m.id || '').toLowerCase() !== targetId.toLowerCase());
+                db.members = db.members.filter((m: any) => (m.id || '').toLowerCase() !== targetId.toLowerCase() && (m.code || '').toLowerCase() !== targetId.toLowerCase());
                 db.grades = db.grades.filter((g: any) => (g.studentId || '').toLowerCase() !== targetId.toLowerCase());
                 writeDb(db);
               }
             }
           } else if (cleanPath.startsWith('/teachers')) {
-            if (req.method === 'POST' && data && data.id) {
-              const idx = db.members.findIndex((m: any) => (m.id || '').toLowerCase() === (data.id || '').toLowerCase());
+            const memberId = data?.code || (data?.id !== undefined ? String(data.id) : undefined);
+            const normalizedTeacher = data ? { ...data, id: memberId || data.id, code: memberId || data.code } : null;
+            if (req.method === 'POST' && normalizedTeacher && normalizedTeacher.id) {
+              const idx = db.members.findIndex((m: any) => (m.id || '').toLowerCase() === (normalizedTeacher.id || '').toLowerCase() || (m.code || '').toLowerCase() === (normalizedTeacher.id || '').toLowerCase());
               if (idx !== -1) {
-                db.members[idx] = { ...db.members[idx], ...data };
+                db.members[idx] = { ...db.members[idx], ...normalizedTeacher };
               } else {
-                db.members.push(data);
+                db.members.push(normalizedTeacher);
               }
               writeDb(db);
-            } else if (req.method === 'PUT' && data && data.id) {
-              const idx = db.members.findIndex((m: any) => (m.id || '').toLowerCase() === (data.id || '').toLowerCase());
+            } else if (req.method === 'PUT' && normalizedTeacher && normalizedTeacher.id) {
+              const idx = db.members.findIndex((m: any) => (m.id || '').toLowerCase() === (normalizedTeacher.id || '').toLowerCase() || (m.code || '').toLowerCase() === (normalizedTeacher.id || '').toLowerCase());
               if (idx !== -1) {
-                db.members[idx] = { ...db.members[idx], ...data };
+                db.members[idx] = { ...db.members[idx], ...normalizedTeacher };
                 writeDb(db);
               }
             } else if (req.method === 'DELETE') {
               const targetId = cleanPath.split('/')[2];
               if (targetId) {
-                db.members = db.members.filter((m: any) => (m.id || '').toLowerCase() !== targetId.toLowerCase());
+                db.members = db.members.filter((m: any) => (m.id || '').toLowerCase() !== targetId.toLowerCase() && (m.code || '').toLowerCase() !== targetId.toLowerCase());
                 writeDb(db);
               }
             }
@@ -634,13 +638,50 @@ function writeDb(data: any) {
   }
 }
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const lang = getRequestLang(req);
   const dict = SERVER_I18N[lang];
   const { email, password } = req.body || {};
 
   const cleanEmail = typeof email === 'string' ? email.trim() : '';
   const cleanPassword = typeof password === 'string' ? password.trim() : '';
+
+  // 1. Thử xác thực trực tiếp với Spring Boot backend (đang kết nối DBeaver / Database thực)
+  if (cleanEmail && cleanPassword) {
+    try {
+      const springRes = await fetch(`${BACKEND_URL}/api/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept-Language': lang
+        },
+        body: JSON.stringify({ email: cleanEmail, password: cleanPassword })
+      });
+      if (springRes.ok) {
+        const springUser = await springRes.json();
+        // Đồng bộ dữ liệu người dùng và mật khẩu từ Database vào db.json
+        const db = readDb();
+        const sEmail = (springUser.email || '').trim().toLowerCase();
+        const sId = (springUser.code || springUser.id || '').trim().toLowerCase();
+        const memberIdx = db.members.findIndex((m: any) => {
+          const mEmail = (m.email || '').trim().toLowerCase();
+          const mId = (m.id || '').trim().toLowerCase();
+          const mCode = (m.code || '').trim().toLowerCase();
+          return (sEmail && mEmail === sEmail) || (sId && (mId === sId || mCode === sId));
+        });
+        if (memberIdx !== -1) {
+          db.members[memberIdx].password = ensureSha1(cleanPassword);
+          db.members[memberIdx].mustChangePassword = springUser.mustChangePassword ?? false;
+          if (springUser.name) db.members[memberIdx].name = springUser.name;
+          writeDb(db);
+          console.log(`[Login Sync] Đã đồng bộ tài khoản ${springUser.email} từ Database vào db.json.`);
+        }
+        return res.json(springUser);
+      }
+    } catch (_) {
+      // Spring Boot backend offline, fallback xử lý bằng db.json
+    }
+  }
 
   const isEmailEmpty = !cleanEmail;
   const isPasswordEmpty = !cleanPassword;
@@ -916,6 +957,17 @@ app.post('/api/change-password', async (req, res) => {
       });
     }
 
+    if (verifyPassword(cleanNewPassword, String(member.password)) || (cleanOldPassword && cleanNewPassword === cleanOldPassword)) {
+      return res.status(400).json({
+        status: 400,
+        error: 'Bad Request',
+        message: 'Mật khẩu mới phải khác mật khẩu hiện tại.',
+        errors: {
+          newPassword: 'Mật khẩu mới phải khác mật khẩu hiện tại.'
+        }
+      });
+    }
+
     db.members[memberIndex].password = ensureSha1(cleanNewPassword);
     db.members[memberIndex].mustChangePassword = false;
     writeDb(db);
@@ -945,7 +997,7 @@ app.post('/api/change-password', async (req, res) => {
 });
 
 // Endpoint Reset mật khẩu do Admin thực hiện
-app.post(['/api/admin/users/:id/reset-password', '/api/members/:id/reset-password'], (req, res) => {
+app.post(['/api/admin/users/:id/reset-password', '/api/members/:id/reset-password'], async (req, res) => {
   try {
     const rawTargetId = req.params.id ? decodeURIComponent(req.params.id).trim().toLowerCase() : '';
     const bodyEmail = (req.body?.email || '').trim().toLowerCase();
@@ -965,9 +1017,24 @@ app.post(['/api/admin/users/:id/reset-password', '/api/members/:id/reset-passwor
       return res.status(404).json({ message: 'Không tìm thấy tài khoản tương ứng!' });
     }
 
-    // Sinh mật khẩu ngẫu nhiên sử dụng SecureRandom có độ dài đúng 10 ký tự
-    // Đảm bảo luôn chứa tối thiểu 1 chữ thường (a-z), 1 chữ hoa (A-Z) và 1 chữ số (0-9)
-    const newPassword = generateSecureRandomPassword(10);
+    // 1. Thử gọi sang Spring Boot backend để cập nhật vào Database (DBeaver)
+    let springPassword = '';
+    try {
+      const springRes = await fetch(`${BACKEND_URL}/api/admin/users/${encodeURIComponent(req.params.id)}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Current-User-Role': 'admin'
+        }
+      });
+      if (springRes.ok) {
+        const springData = await springRes.json();
+        springPassword = springData.newPassword || '';
+      }
+    } catch (_) {}
+
+    // 2. Sử dụng mật khẩu từ Spring Boot (nếu có) hoặc sinh ngẫu nhiên 10 ký tự bằng SecureRandom
+    const newPassword = springPassword || generateSecureRandomPassword(10);
 
     db.members[memberIndex].password = ensureSha1(newPassword);
     db.members[memberIndex].mustChangePassword = true;
@@ -991,11 +1058,12 @@ app.post(['/api/admin/users/:id/reset-password', '/api/members/:id/reset-passwor
 });
 
 // Endpoint Đổi mật khẩu bắt buộc lần đầu (Force Change Password)
-app.post(['/api/auth/force-change-password', '/api/force-change-password'], (req, res) => {
+app.post(['/api/auth/force-change-password', '/api/force-change-password'], async (req, res) => {
   try {
-    const { email, userId, newPassword, confirmPassword } = req.body || {};
+    const { email, userId, newPassword, confirmPassword, oldPassword } = req.body || {};
     const cleanNew = typeof newPassword === 'string' ? newPassword.trim() : '';
     const cleanConfirm = typeof confirmPassword === 'string' ? confirmPassword.trim() : '';
+    const cleanOld = typeof oldPassword === 'string' ? oldPassword.trim() : '';
 
     if (!cleanNew || cleanNew.length < 6) {
       return res.status(400).json({ message: 'Mật khẩu mới phải có ít nhất 6 ký tự.' });
@@ -1019,9 +1087,25 @@ app.post(['/api/auth/force-change-password', '/api/force-change-password'], (req
       return res.status(404).json({ message: 'Không tìm thấy thông tin tài khoản cần đổi mật khẩu!' });
     }
 
+    if (verifyPassword(cleanNew, String(db.members[memberIndex].password)) || (cleanOld && cleanNew === cleanOld)) {
+      return res.status(400).json({ message: 'Mật khẩu mới phải khác mật khẩu hiện tại.' });
+    }
+
     db.members[memberIndex].password = ensureSha1(cleanNew);
     db.members[memberIndex].mustChangePassword = false;
     writeDb(db);
+
+    // Đồng bộ sang Spring Boot backend nếu có
+    try {
+      await fetch(`${BACKEND_URL}/api/auth/force-change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Current-User-Email': targetEmail
+        },
+        body: JSON.stringify({ email: targetEmail, userId: targetId, newPassword: cleanNew, confirmPassword: cleanConfirm, oldPassword: cleanOld })
+      });
+    } catch (_) {}
 
     console.log(`[Force Change Password] Cập nhật thành công cho ${db.members[memberIndex].id}`);
     const userCopy = { ...db.members[memberIndex] };
@@ -2052,7 +2136,7 @@ app.post('/api/teachers/:id/auto-assign', (req, res) => {
   });
 });
 
-app.post('/api/students', (req, res) => {
+app.post('/api/students', async (req, res) => {
   const student = req.body || {};
   const db = readDb();
   const cleanId = (student.id || '').trim().toUpperCase();
@@ -2068,14 +2152,30 @@ app.post('/api/students', (req, res) => {
     return res.status(400).json({ message: `Email ${cleanEmail} đã tồn tại trong hệ thống.` });
   }
 
+  const rawPassword = (student.password || '').trim() || generateSecureRandomPassword(10);
   const newStudent = {
     ...student,
     id: cleanId,
+    code: cleanId,
     email: cleanEmail,
-    password: ensureSha1(student.password || generateSecureRandomPassword(10)),
+    password: ensureSha1(rawPassword),
     role: 'student',
     className: student.className || ''
   };
+
+  // Đồng bộ sang Spring Boot backend nếu online
+  try {
+    await fetch(`${BACKEND_URL}/api/students`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...newStudent,
+        code: cleanId,
+        password: rawPassword
+      })
+    });
+  } catch (_) {}
+
   db.members.push(newStudent);
   
   // Ensure default record in db.grades
@@ -2095,7 +2195,7 @@ app.post('/api/students', (req, res) => {
   res.status(201).json(newStudent);
 });
 
-app.put('/api/students/:id', (req, res) => {
+app.put('/api/students/:id', async (req, res) => {
   const { id } = req.params;
   const updatedStudent = req.body || {};
   const db = readDb();
@@ -2114,8 +2214,10 @@ app.put('/api/students/:id', (req, res) => {
       ...db.members[index],
       ...updatedStudent,
       id: targetId,
+      code: targetId,
       email: cleanEmail,
-      role: 'student'
+      role: 'student',
+      password: updatedStudent.password ? ensureSha1(updatedStudent.password) : db.members[index].password
     };
 
     if (!updatedStudent.className || updatedStudent.className.trim() === '') {
@@ -2131,6 +2233,15 @@ app.put('/api/students/:id', (req, res) => {
         };
       }
     }
+
+    // Đồng bộ sang Spring Boot backend nếu online
+    try {
+      await fetch(`${BACKEND_URL}/api/students/${encodeURIComponent(targetId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(db.members[index])
+      });
+    } catch (_) {}
 
     writeDb(db);
     console.log(`[DB Sync] Đã cập nhật học sinh ${targetId} (${cleanEmail}) trong db.json thành công.`);

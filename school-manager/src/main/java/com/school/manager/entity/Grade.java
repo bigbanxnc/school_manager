@@ -1,15 +1,13 @@
 package com.school.manager.entity;
 
+import com.school.manager.util.ScoreUtil;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 @Entity
@@ -46,8 +44,6 @@ public class Grade {
 
     @Column(name = "student_code", length = 50)
     private String studentCode;
-
-
 
     @com.fasterxml.jackson.annotation.JsonSetter("studentId")
     public void deserializeStudentId(Object val) {
@@ -121,59 +117,13 @@ public class Grade {
                 new SubjectConfig(v -> this.math = v, math_oral, math_m15, math_mid, math_final),
                 new SubjectConfig(v -> this.literature = v, literature_oral, literature_m15, literature_mid, literature_final),
                 new SubjectConfig(v -> this.english = v, english_oral, english_m15, english_mid, english_final)
-        ).forEach(sub ->
-                Optional.ofNullable(calculateSubjectAverage(sub.oral, sub.m15, sub.mid, sub.finalScore))
-                        .ifPresent(sub.setter)
-        );
+        ).forEach(sub -> sub.setter.accept(ScoreUtil.calculateAverage(sub.oral, sub.m15, sub.mid, sub.finalScore)));
 
-        java.util.DoubleSummaryStatistics stats = java.util.stream.Stream.of(math, literature, english)
-                .filter(java.util.Objects::nonNull)
-                .mapToDouble(Double::doubleValue)
-                .summaryStatistics();
-        this.gpa = stats.getCount() > 0 ? Math.round(stats.getAverage() * 100.0) / 100.0 : null;
+        this.gpa = ScoreUtil.calculateGpa(math, literature, english);
     }
 
     private record SubjectConfig(
             Consumer<Double> setter,
             Double oral, Double m15, Double mid, Double finalScore
     ) {}
-
-    private static class SubjectPair {
-        @Getter
-        public Double value;
-        public Double rate;
-
-        public SubjectPair(Double value, Double rate) {
-            this.value = value;
-            this.rate = rate;
-        }
-    }
-
-    private Double calculateSubjectAverage(List<SubjectPair> SubjectPairList) {
-        if (SubjectPairList == null || SubjectPairList.isEmpty()) {
-            return null;
-        }
-
-        AtomicReference<Double> sum = new AtomicReference<>(0.0);
-        AtomicReference<Double> totalWeight = new AtomicReference<>(0.0);
-
-        SubjectPairList.stream().filter(s -> s != null && s.value != null)
-                .forEach(s -> {
-                    sum.updateAndGet(v -> v + s.value * s.rate);
-                    totalWeight.updateAndGet(v -> v + s.rate);
-                });
-
-        return totalWeight.get() > 0
-                ? Math.round((sum.get() / totalWeight.get()) * 100.0) / 100.0
-                : null;
-    }
-
-    private Double calculateSubjectAverage(Double oral, Double m15, Double mid, Double finalScore) {
-        return calculateSubjectAverage(List.of(
-                new SubjectPair(oral, 1.0),
-                new SubjectPair(m15, 1.0),
-                new SubjectPair(mid, 2.0),
-                new SubjectPair(finalScore, 3.0)
-        ));
-    }
 }

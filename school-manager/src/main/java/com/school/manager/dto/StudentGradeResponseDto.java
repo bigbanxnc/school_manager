@@ -40,13 +40,6 @@ public class StudentGradeResponseDto {
     private Double gpa;
 
     public Double getGpa() {
-        if (this.gpa != null) {
-            return this.gpa;
-        }
-        java.util.DoubleSummaryStatistics stats = java.util.stream.Stream.of(math, literature, english)
-                .filter(java.util.Objects::nonNull)
-                .mapToDouble(Double::doubleValue)
-                .summaryStatistics();
-        return stats.getCount() > 0 ? Math.round(stats.getAverage() * 100.0) / 100.0 : null;
+        return this.gpa != null ? this.gpa : com.school.manager.util.ScoreUtil.calculateGpa(math, literature, english);
     }
 }

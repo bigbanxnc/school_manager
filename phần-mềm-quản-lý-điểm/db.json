@@ -42,7 +42,7 @@
       "id": "AD001",
       "name": "Quản trị viên",
       "email": "admin@gmail.com",
-      "password": "603cac5a34c35dcf8950b3e11b4df07461d5d96d",
+      "password": "f865b53623b121fd34ee5426c792e5c33af8c227",
       "role": "admin",
       "permissions": {
         "createClass": true,
@@ -67,13 +67,13 @@
         "teacherAutoClaimClass": true,
         "manageRolePermissions": true
       },
-      "mustChangePassword": true
+      "mustChangePassword": false
     },
     {
       "id": "GV01",
       "name": "Nguyễn Văn Hùng",
       "email": "gv01@edu.com",
-      "password": "a7ffce0d950319414920c2ee467339e21a146cf8",
+      "password": "a1fca3512c492bc57a93418e9d615544c7d64c13",
       "role": "teacher",
       "subject": "math",
       "assignedClasses": [
@@ -138,7 +138,8 @@
         "studentViewGrades": false,
         "teacherAutoClaimClass": true,
         "manageRolePermissions": false
-      }
+      },
+      "mustChangePassword": false
     },
     {
       "id": "GV03",
@@ -591,7 +592,8 @@
         "studentViewGrades": false,
         "teacherAutoClaimClass": true,
         "manageRolePermissions": false
-      }
+      },
+      "mustChangePassword": false
     },
     {
       "id": "HS001",
@@ -628,7 +630,7 @@
       "id": "HS002",
       "name": "Hoàng Quỳnh Thủy",
       "email": "hoang.quynh.thuy.hs002@gmail.com",
-      "password": "47187b3588a71a78c610a40b90e7961887b58fdb",
+      "password": "0d600817f4cf37cfd51ff9ef1f275339418f79cc",
       "role": "student",
       "className": "10A1",
       "permissions": {
@@ -653,7 +655,8 @@
         "studentViewGrades": true,
         "teacherAutoClaimClass": false,
         "manageRolePermissions": false
-      }
+      },
+      "mustChangePassword": true
     },
     {
       "id": "HS003",
@@ -746,7 +749,8 @@
         "studentViewGrades": true,
         "teacherAutoClaimClass": false,
         "manageRolePermissions": false
-      }
+      },
+      "mustChangePassword": false
     },
     {
       "id": "HS006",
@@ -1930,7 +1934,7 @@
       "id": "HS044",
       "name": "Lê Xuân Anh",
       "email": "le.xuan.anh.hs044@gmail.com",
-      "password": "47187b3588a71a78c610a40b90e7961887b58fdb",
+      "password": "1afc9fe450c178858a02d2f3aa511d5c0dda42d5",
       "role": "student",
       "className": "10A3",
       "permissions": {
@@ -1955,7 +1959,8 @@
         "studentViewGrades": true,
         "teacherAutoClaimClass": false,
         "manageRolePermissions": false
-      }
+      },
+      "mustChangePassword": true
     },
     {
       "id": "HS045",
@@ -2860,7 +2865,7 @@
       "id": "HS074",
       "name": "Phan Gia Sơn",
       "email": "phan.gia.son.hs074@gmail.com",
-      "password": "47187b3588a71a78c610a40b90e7961887b58fdb",
+      "password": "9f080d0d3bdec385de1c4a2ef5398d436fecc3ee",
       "role": "student",
       "className": "11A1",
       "permissions": {
@@ -2885,7 +2890,8 @@
         "studentViewGrades": true,
         "teacherAutoClaimClass": false,
         "manageRolePermissions": false
-      }
+      },
+      "mustChangePassword": true
     },
     {
       "id": "HS075",
@@ -4317,7 +4323,7 @@
       "id": "HS121",
       "name": "Phan Thị Diệp",
       "email": "phan.thi.diep.hs121@gmail.com",
-      "password": "47187b3588a71a78c610a40b90e7961887b58fdb",
+      "password": "cc052e2471e10df0d342aea484ec92eaa77a56da",
       "role": "student",
       "className": "12A1",
       "permissions": {
@@ -4342,7 +4348,8 @@
         "studentViewGrades": true,
         "teacherAutoClaimClass": false,
         "manageRolePermissions": false
-      }
+      },
+      "mustChangePassword": true
     },
     {
       "id": "HS122",
@@ -6154,6 +6161,18 @@
       "subject": null,
       "assignedClasses": [],
       "mustChangePassword": true
+    },
+    {
+      "name": "Lê Việt Hùng",
+      "email": "le.viet.hung.hs184@gmail.com",
+      "password": "9d2a1e35eacd39d8d73b86a5852fb58e6b7026f3",
+      "role": "student",
+      "className": null,
+      "subject": null,
+      "assignedClasses": [],
+      "id": "HS184",
+      "code": "HS184",
+      "mustChangePassword": false
     }
   ],
   "grades": [
@@ -9381,6 +9400,24 @@
     },
     {
       "studentId": "HS181",
+      "math": null,
+      "literature": null,
+      "english": null
+    },
+    {
+      "studentId": "HS187",
+      "math": null,
+      "literature": null,
+      "english": null
+    },
+    {
+      "studentId": "HS188",
+      "math": null,
+      "literature": null,
+      "english": null
+    },
+    {
+      "studentId": "HS184",
       "math": null,
       "literature": null,
       "english": null

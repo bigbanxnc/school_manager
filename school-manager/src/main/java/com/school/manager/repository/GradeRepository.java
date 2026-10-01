@@ -15,39 +15,69 @@ import java.util.Optional;
 @Repository
 public interface GradeRepository extends JpaRepository<Grade, Long>, JpaSpecificationExecutor<Grade> {
 
-    Optional<Grade> findByStudentId(String studentId);
+    @Query("SELECT g FROM Grade g WHERE LOWER(g.studentCode) = LOWER(:code) OR LOWER(g.studentId) = LOWER(:code)")
+    Optional<Grade> findByStudentCodeIgnoreCase(@Param("code") String code);
 
-    Optional<Grade> findByStudentCode(String studentCode);
+    @Query("SELECT g FROM Grade g WHERE g.studentId = :studentId OR LOWER(g.studentCode) = LOWER(:studentId)")
+    Optional<Grade> findByStudentIdStr(@Param("studentId") String studentId);
 
-    @Query("SELECT g FROM Grade g WHERE g.studentId = :idOrCode OR g.studentCode = :idOrCode")
-    Optional<Grade> findByStudentIdOrCode(@Param("idOrCode") String idOrCode);
+    @Query("SELECT COUNT(g) > 0 FROM Grade g WHERE LOWER(g.studentCode) = LOWER(:code) OR LOWER(g.studentId) = LOWER(:code)")
+    boolean existsByStudentCodeIgnoreCase(@Param("code") String code);
 
-    boolean existsByStudentId(String studentId);
+    @Query("SELECT COUNT(g) > 0 FROM Grade g WHERE g.studentId = :studentId OR LOWER(g.studentCode) = LOWER(:studentId)")
+    boolean existsByStudentIdStr(@Param("studentId") String studentId);
 
-    boolean existsByStudentCode(String studentCode);
+    default Optional<Grade> findByStudentIdOrCode(String idOrCode) {
+        if (idOrCode == null || idOrCode.trim().isEmpty()) {
+            return Optional.empty();
+        }
+        String trimmed = idOrCode.trim();
+        Optional<Grade> byCode = findByStudentCodeIgnoreCase(trimmed);
+        if (byCode.isPresent()) {
+            return byCode;
+        }
+        try {
+            Long.parseLong(trimmed);
+            return findByStudentIdStr(trimmed);
+        } catch (NumberFormatException ignored) {
+            return Optional.empty();
+        }
+    }
+
+    default Optional<Grade> findByStudentId(Long studentId) {
+        return studentId == null ? Optional.empty() : findByStudentIdStr(String.valueOf(studentId));
+    }
+
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    default boolean existsByStudentId(Long studentId) {
+        return studentId != null && existsByStudentIdStr(String.valueOf(studentId));
+    }
 
     @Modifying
     @Transactional
-    @Query("DELETE FROM Grade g WHERE g.studentId = :idOrCode OR g.studentCode = :idOrCode")
-    void deleteByStudentIdOrCode(@Param("idOrCode") String idOrCode);
+    @Query("DELETE FROM Grade g WHERE LOWER(g.studentCode) = LOWER(:code)")
+    void deleteByStudentCode(@Param("code") String code);
 
-    default Optional<Grade> findByStudentId(Long studentId) {
-        return studentId == null ? Optional.empty() : findByStudentIdOrCode(String.valueOf(studentId));
-    }
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM Grade g WHERE g.studentId = :studentId")
+    void deleteByStudentIdStr(@Param("studentId") String studentId);
 
-    default boolean existsByStudentId(Long studentId) {
-        return studentId != null && (existsByStudentId(String.valueOf(studentId)) || existsByStudentCode(String.valueOf(studentId)));
+    default void deleteByStudentIdOrCode(String idOrCode) {
+        if (idOrCode == null || idOrCode.trim().isEmpty()) {
+            return;
+        }
+        String trimmed = idOrCode.trim();
+        deleteByStudentCode(trimmed);
+        try {
+            Long.parseLong(trimmed);
+            deleteByStudentIdStr(trimmed);
+        } catch (NumberFormatException ignored) {}
     }
 
     default void deleteByStudentId(Long studentId) {
         if (studentId != null) {
             deleteByStudentIdOrCode(String.valueOf(studentId));
-        }
-    }
-
-    default void deleteByStudentId(String studentId) {
-        if (studentId != null) {
-            deleteByStudentIdOrCode(studentId);
         }
     }
 

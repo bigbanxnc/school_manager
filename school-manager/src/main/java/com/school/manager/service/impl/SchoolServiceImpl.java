@@ -15,7 +15,9 @@ import com.school.manager.service.SchoolService;
 import com.school.manager.specification.MemberSpecification;
 import com.school.manager.util.PasswordGenerator;
 import com.school.manager.util.PasswordUtil;
+import com.school.manager.util.ScoreUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -23,7 +25,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.function.Consumer;
 
+@Slf4j
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -88,6 +92,12 @@ public class SchoolServiceImpl implements SchoolService {
         if (!PasswordUtil.matches(request.getOldPassword(), member.getPassword())) {
             throw AppException.badRequest("Mật khẩu hiện tại không chính xác!",
                     Map.of("oldPassword", "Mật khẩu hiện tại không chính xác."));
+        }
+
+        if (PasswordUtil.matches(request.getNewPassword(), member.getPassword())
+                || (request.getOldPassword() != null && request.getNewPassword().trim().equals(request.getOldPassword().trim()))) {
+            throw AppException.badRequest("Mật khẩu mới phải khác mật khẩu hiện tại!",
+                    Map.of("newPassword", "Mật khẩu mới phải khác mật khẩu hiện tại."));
         }
 
         member.setPassword(PasswordUtil.ensureSha1(request.getNewPassword().trim()));
@@ -169,6 +179,12 @@ public class SchoolServiceImpl implements SchoolService {
             }
         }
 
+        if (PasswordUtil.matches(request.getNewPassword(), member.getPassword())
+                || (request.getOldPassword() != null && request.getNewPassword().trim().equals(request.getOldPassword().trim()))) {
+            throw AppException.badRequest("Mật khẩu mới phải khác mật khẩu hiện tại!",
+                    Map.of("newPassword", "Mật khẩu mới phải khác mật khẩu hiện tại."));
+        }
+
         member.setPassword(PasswordUtil.ensureSha1(request.getNewPassword().trim()));
         member.setMustChangePassword(false);
         Member saved = memberRepository.save(member);
@@ -178,10 +194,16 @@ public class SchoolServiceImpl implements SchoolService {
     @Override
     public String getNextId(String role) {
         List<Member> members = memberRepository.findByRole(role);
-        int maxNum = extractMaxNumberFromMembers(members);
-        int nextNum = maxNum + 1;
-        String prefix = "teacher".equalsIgnoreCase(role) ? "GV" : ("student".equalsIgnoreCase(role) ? "HS" : "MEM");
-        int padLength = "student".equalsIgnoreCase(role) ? 3 : 2;
+        int nextNum = extractMaxNumberFromMembers(members) + 1;
+
+        String normalizedRole = (role != null) ? role.trim().toLowerCase() : "";
+        String prefix = switch (normalizedRole) {
+            case "teacher" -> "GV";
+            case "student" -> "HS";
+            default -> "MEM";
+        };
+        int padLength = "student".equals(normalizedRole) ? 3 : 2;
+
         return prefix + String.format("%0" + padLength + "d", nextNum);
     }
 
@@ -301,9 +323,10 @@ public class SchoolServiceImpl implements SchoolService {
         if (entity.getAssignedClasses() == null) {
             entity.setAssignedClasses(new ArrayList<>());
         }
-        if (entity.getPassword() != null && !entity.getPassword().trim().isEmpty()) {
-            entity.setPassword(PasswordUtil.ensureSha1(entity.getPassword()));
-        }
+        String rawTeacherPass = (entity.getPassword() != null && !entity.getPassword().trim().isEmpty())
+                ? entity.getPassword().trim()
+                : PasswordGenerator.generatePassword();
+        entity.setPassword(PasswordUtil.ensureSha1(rawTeacherPass));
         Member saved = memberRepository.save(entity);
         return memberMapper.toDto(saved);
     }
@@ -340,26 +363,84 @@ public class SchoolServiceImpl implements SchoolService {
 
     @Override
     public MemberDto createStudent(MemberDto studentDto) {
-        Member entity = memberMapper.toEntity(studentDto);
-        entity.setId(null);
-        entity.setRole("student");
-        entity.setCode((entity.getCode() == null || entity.getCode().trim().isEmpty())
-                ? getNextId("student")
-                : entity.getCode().trim());
-        if (entity.getPassword() != null && !entity.getPassword().trim().isEmpty()) {
-            entity.setPassword(PasswordUtil.ensureSha1(entity.getPassword()));
+        if (studentDto == null) {
+            throw AppException.badRequest("Thông tin học sinh không được để trống!");
         }
-        Member saved = memberRepository.save(entity);
+
+        String studentCode = studentDto.getCode();
+        if (studentCode == null || studentCode.trim().isEmpty()) {
+            studentCode = getNextId("student");
+        } else {
+            studentCode = studentCode.trim().toUpperCase();
+        }
+
+        // Kiểm tra trùng lặp mã học sinh
+        if (memberRepository.findByCode(studentCode).isPresent()) {
+            throw AppException.badRequest("Mã học sinh " + studentCode + " đã tồn tại trong hệ thống!",
+                    Map.of("code", "Mã học sinh đã tồn tại trong hệ thống."));
+        }
+
+        // Kiểm tra trùng lặp email
+        String email = studentDto.getEmail();
+        if (email != null && !email.trim().isEmpty()) {
+            email = email.trim().toLowerCase();
+            if (memberRepository.findByEmailIgnoreCase(email).isPresent()) {
+                throw AppException.badRequest("Email " + email + " đã tồn tại trong hệ thống!",
+                        Map.of("email", "Email đã tồn tại trong hệ thống."));
+            }
+        } else {
+            email = studentCode.toLowerCase() + "@gmail.com";
+        }
+
+        // Xử lý className an toàn để không bị lỗi ràng buộc khóa ngoại (foreign key fk_member_class)
+        String cls = studentDto.getClassName();
+        if (cls == null || cls.trim().isEmpty() || "unassigned".equalsIgnoreCase(cls.trim()) || "none".equalsIgnoreCase(cls.trim())) {
+            cls = null;
+        } else {
+            cls = classRepository.findByIdOrCode(cls.trim()).map(SchoolClass::getCode).orElse(null);
+        }
+
+        String name = studentDto.getName();
+        if (name == null || name.trim().isEmpty()) {
+            name = "Học sinh " + studentCode;
+        } else {
+            name = name.trim();
+        }
+
+        String rawPassword = (studentDto.getPassword() != null && !studentDto.getPassword().trim().isEmpty())
+                ? studentDto.getPassword().trim()
+                : PasswordGenerator.generatePassword();
+
+        Member entity = Member.builder()
+                .code(studentCode)
+                .name(name)
+                .email(email)
+                .password(PasswordUtil.ensureSha1(rawPassword))
+                .role("student")
+                .className(cls)
+                .mustChangePassword(false)
+                .assignedClasses(new ArrayList<>())
+                .build();
+
+        Member saved = memberRepository.saveAndFlush(entity);
 
         // Khởi tạo bản ghi Grade cho học sinh mới để hiển thị đầy đủ trong bảng điểm
         if (saved.getId() != null) {
-            Long sId = saved.getId();
-            if (!gradeRepository.existsByStudentId(sId)) {
-                Grade initialGrade = Grade.builder()
-                        .studentId(sId)
-                        .studentCode(saved.getCode())
-                        .build();
-                gradeRepository.save(initialGrade);
+            String sCode = (saved.getCode() != null && !saved.getCode().trim().isEmpty())
+                    ? saved.getCode().trim().toUpperCase()
+                    : String.valueOf(saved.getId());
+            boolean gradeExists = gradeRepository.findByStudentCodeIgnoreCase(sCode).isPresent()
+                    || gradeRepository.findByStudentId(saved.getId()).isPresent();
+            if (!gradeExists) {
+                try {
+                    Grade initialGrade = Grade.builder()
+                            .studentId(sCode)
+                            .studentCode(sCode)
+                            .build();
+                    gradeRepository.saveAndFlush(initialGrade);
+                } catch (Exception e) {
+                    log.warn("Không thể khởi tạo bản ghi điểm ban đầu cho học sinh {}: {}", saved.getCode(), e.getMessage());
+                }
             }
         }
 
@@ -638,51 +719,6 @@ public class SchoolServiceImpl implements SchoolService {
                 .orElse(null);
     }
 
-    private Double calculateGpa(Double math, Double literature, Double english) {
-        java.util.DoubleSummaryStatistics stats = java.util.stream.Stream.of(math, literature, english)
-                .filter(java.util.Objects::nonNull)
-                .mapToDouble(Double::doubleValue)
-                .summaryStatistics();
-        return stats.getCount() > 0 ? Math.round(stats.getAverage() * 100.0) / 100.0 : null;
-    }
-
-    private static class SubjectPair {
-        public Double value;
-        public Double rate;
-
-        public SubjectPair(Double value, Double rate) {
-            this.value = value;
-            this.rate = rate;
-        }
-    }
-
-    private Double calculateSubjectAverage(Double oral, Double m15, Double mid, Double finalScore) {
-        return calculateSubjectAverage(List.of(
-                new SubjectPair(oral, 1.0),
-                new SubjectPair(m15, 1.0),
-                new SubjectPair(mid, 2.0),
-                new SubjectPair(finalScore, 3.0)
-        ));
-    }
-
-    private Double calculateSubjectAverage(List<SubjectPair> subjectPairList) {
-        if (subjectPairList == null || subjectPairList.isEmpty()) {
-            return null;
-        }
-        java.util.concurrent.atomic.AtomicReference<Double> sum = new java.util.concurrent.atomic.AtomicReference<>(0.0);
-        java.util.concurrent.atomic.AtomicReference<Double> totalWeight = new java.util.concurrent.atomic.AtomicReference<>(0.0);
-
-        subjectPairList.stream().filter(s -> s != null && s.value != null)
-                .forEach(s -> {
-                    sum.updateAndGet(v -> v + s.value * s.rate);
-                    totalWeight.updateAndGet(v -> v + s.rate);
-                });
-
-        return totalWeight.get() > 0
-                ? Math.round((sum.get() / totalWeight.get()) * 100.0) / 100.0
-                : null;
-    }
-
     private record SubjectScoreView(
             String name,
             Double avg,
@@ -697,13 +733,13 @@ public class SchoolServiceImpl implements SchoolService {
             return;
         }
         Double math = java.util.Optional.ofNullable(grade.getMath())
-                .orElseGet(() -> calculateSubjectAverage(grade.getMath_oral(), grade.getMath_m15(), grade.getMath_mid(), grade.getMath_final()));
+                .orElseGet(() -> ScoreUtil.calculateAverage(grade.getMath_oral(), grade.getMath_m15(), grade.getMath_mid(), grade.getMath_final()));
         Double literature = java.util.Optional.ofNullable(grade.getLiterature())
-                .orElseGet(() -> calculateSubjectAverage(grade.getLiterature_oral(), grade.getLiterature_m15(), grade.getLiterature_mid(), grade.getLiterature_final()));
+                .orElseGet(() -> ScoreUtil.calculateAverage(grade.getLiterature_oral(), grade.getLiterature_m15(), grade.getLiterature_mid(), grade.getLiterature_final()));
         Double english = java.util.Optional.ofNullable(grade.getEnglish())
-                .orElseGet(() -> calculateSubjectAverage(grade.getEnglish_oral(), grade.getEnglish_m15(), grade.getEnglish_mid(), grade.getEnglish_final()));
+                .orElseGet(() -> ScoreUtil.calculateAverage(grade.getEnglish_oral(), grade.getEnglish_m15(), grade.getEnglish_mid(), grade.getEnglish_final()));
         Double gpa = java.util.Optional.ofNullable(grade.getGpa())
-                .orElseGet(() -> calculateGpa(math, literature, english));
+                .orElseGet(() -> ScoreUtil.calculateGpa(math, literature, english));
 
         String cleanSubject = (subject != null) ? subject.trim().toLowerCase() : null;
 
@@ -805,41 +841,48 @@ public class SchoolServiceImpl implements SchoolService {
         return buildGradeRecordMap(grade, subject);
     }
 
+    private void applySubjectGradeUpdate(
+            Consumer<Double> setOral, Consumer<Double> setM15,
+            Consumer<Double> setMid, Consumer<Double> setFinal,
+            Consumer<Double> setAvg,
+            Double oral, Double m15, Double mid, Double finalScore, Double avg
+    ) {
+        setOral.accept(oral);
+        setM15.accept(m15);
+        setMid.accept(mid);
+        setFinal.accept(finalScore);
+        if (oral == null && m15 == null && mid == null && finalScore == null) {
+            setAvg.accept(avg);
+        }
+    }
+
+    private void clearGradeFields(Consumer<Double> setOral, Consumer<Double> setM15,
+                                  Consumer<Double> setMid, Consumer<Double> setFinal,
+                                  Consumer<Double> setAvg) {
+        setOral.accept(null);
+        setM15.accept(null);
+        setMid.accept(null);
+        setFinal.accept(null);
+        setAvg.accept(null);
+    }
+
     private void updateSubjectGrades(Grade grade, GradeDto gradeDto, String subject) {
         if (grade == null || gradeDto == null || subject == null) {
             return;
         }
         switch (subject.trim().toLowerCase()) {
-            case "math" -> {
-                grade.setMath_oral(gradeDto.getMath_oral());
-                grade.setMath_m15(gradeDto.getMath_m15());
-                grade.setMath_mid(gradeDto.getMath_mid());
-                grade.setMath_final(gradeDto.getMath_final());
-                if (gradeDto.getMath_oral() == null && gradeDto.getMath_m15() == null
-                        && gradeDto.getMath_mid() == null && gradeDto.getMath_final() == null) {
-                    grade.setMath(gradeDto.getMath());
-                }
-            }
-            case "literature" -> {
-                grade.setLiterature_oral(gradeDto.getLiterature_oral());
-                grade.setLiterature_m15(gradeDto.getLiterature_m15());
-                grade.setLiterature_mid(gradeDto.getLiterature_mid());
-                grade.setLiterature_final(gradeDto.getLiterature_final());
-                if (gradeDto.getLiterature_oral() == null && gradeDto.getLiterature_m15() == null
-                        && gradeDto.getLiterature_mid() == null && gradeDto.getLiterature_final() == null) {
-                    grade.setLiterature(gradeDto.getLiterature());
-                }
-            }
-            case "english" -> {
-                grade.setEnglish_oral(gradeDto.getEnglish_oral());
-                grade.setEnglish_m15(gradeDto.getEnglish_m15());
-                grade.setEnglish_mid(gradeDto.getEnglish_mid());
-                grade.setEnglish_final(gradeDto.getEnglish_final());
-                if (gradeDto.getEnglish_oral() == null && gradeDto.getEnglish_m15() == null
-                        && gradeDto.getEnglish_mid() == null && gradeDto.getEnglish_final() == null) {
-                    grade.setEnglish(gradeDto.getEnglish());
-                }
-            }
+            case "math" -> applySubjectGradeUpdate(
+                    grade::setMath_oral, grade::setMath_m15, grade::setMath_mid, grade::setMath_final, grade::setMath,
+                    gradeDto.getMath_oral(), gradeDto.getMath_m15(), gradeDto.getMath_mid(), gradeDto.getMath_final(), gradeDto.getMath()
+            );
+            case "literature" -> applySubjectGradeUpdate(
+                    grade::setLiterature_oral, grade::setLiterature_m15, grade::setLiterature_mid, grade::setLiterature_final, grade::setLiterature,
+                    gradeDto.getLiterature_oral(), gradeDto.getLiterature_m15(), gradeDto.getLiterature_mid(), gradeDto.getLiterature_final(), gradeDto.getLiterature()
+            );
+            case "english" -> applySubjectGradeUpdate(
+                    grade::setEnglish_oral, grade::setEnglish_m15, grade::setEnglish_mid, grade::setEnglish_final, grade::setEnglish,
+                    gradeDto.getEnglish_oral(), gradeDto.getEnglish_m15(), gradeDto.getEnglish_mid(), gradeDto.getEnglish_final(), gradeDto.getEnglish()
+            );
             default -> {}
         }
     }
@@ -849,27 +892,9 @@ public class SchoolServiceImpl implements SchoolService {
             return;
         }
         switch (subject.trim().toLowerCase()) {
-            case "math" -> {
-                grade.setMath(null);
-                grade.setMath_oral(null);
-                grade.setMath_m15(null);
-                grade.setMath_mid(null);
-                grade.setMath_final(null);
-            }
-            case "literature" -> {
-                grade.setLiterature(null);
-                grade.setLiterature_oral(null);
-                grade.setLiterature_m15(null);
-                grade.setLiterature_mid(null);
-                grade.setLiterature_final(null);
-            }
-            case "english" -> {
-                grade.setEnglish(null);
-                grade.setEnglish_oral(null);
-                grade.setEnglish_m15(null);
-                grade.setEnglish_mid(null);
-                grade.setEnglish_final(null);
-            }
+            case "math" -> clearGradeFields(grade::setMath_oral, grade::setMath_m15, grade::setMath_mid, grade::setMath_final, grade::setMath);
+            case "literature" -> clearGradeFields(grade::setLiterature_oral, grade::setLiterature_m15, grade::setLiterature_mid, grade::setLiterature_final, grade::setLiterature);
+            case "english" -> clearGradeFields(grade::setEnglish_oral, grade::setEnglish_m15, grade::setEnglish_mid, grade::setEnglish_final, grade::setEnglish);
             default -> {}
         }
     }
@@ -1083,59 +1108,69 @@ public class SchoolServiceImpl implements SchoolService {
                 continue;
             }
 
-            List<SchoolClass> missingClasses = new ArrayList<>(classes.stream()
-                    .filter(c -> teachers.stream().noneMatch(t ->
-                            subject.equalsIgnoreCase(t.getSubject())
-                                    && t.getAssignedClasses() != null
-                                    && t.getAssignedClasses().contains(c.getCode())))
-                    .toList());
-
+            List<SchoolClass> missingClasses = new ArrayList<>(findClassesMissingSubjectTeacher(classes, teachers, subject));
             Collections.shuffle(missingClasses);
 
             for (SchoolClass c : missingClasses) {
-                boolean hasSubjectTeacher = teachers.stream()
-                        .anyMatch(t -> subject.equalsIgnoreCase(t.getSubject())
-                                && t.getAssignedClasses() != null
-                                && t.getAssignedClasses().contains(c.getCode()));
-
-                if (!hasSubjectTeacher) {
-                    List<Member> availableTeachers = subjectTeachers.stream()
-                            .filter(t -> t.getAssignedClasses() == null || !t.getAssignedClasses().contains(c.getCode()))
-                            .toList();
-
-                    if (availableTeachers.isEmpty()) {
-                        continue;
-                    }
-
-                    List<Member> underLimitTeachers = availableTeachers.stream()
-                            .filter(t -> (t.getAssignedClasses() == null ? 0 : t.getAssignedClasses().size()) < 2)
-                            .toList();
-
-                    List<Member> pool = !underLimitTeachers.isEmpty() ? underLimitTeachers : availableTeachers;
-
-                    int minClasses = pool.stream()
-                            .mapToInt(t -> t.getAssignedClasses() != null ? t.getAssignedClasses().size() : 0)
-                            .min()
-                            .orElse(0);
-
-                    List<Member> candidates = new ArrayList<>(pool.stream()
-                            .filter(t -> (t.getAssignedClasses() == null ? 0 : t.getAssignedClasses().size()) == minClasses)
-                            .toList());
-
-                    if (!candidates.isEmpty()) {
-                        Collections.shuffle(candidates);
-                        Member chosen = candidates.getFirst();
-                        if (chosen.getAssignedClasses() == null) {
-                            chosen.setAssignedClasses(new ArrayList<>());
-                        }
-                        chosen.getAssignedClasses().add(c.getCode());
-                    }
+                if (hasClassSubjectTeacher(teachers, c.getCode(), subject)) {
+                    continue;
                 }
+                selectBestCandidateTeacher(subjectTeachers, c.getCode())
+                        .ifPresent(teacher -> assignClassToTeacher(teacher, c.getCode()));
             }
         }
 
         memberRepository.saveAll(teachers);
         return getAllMembers();
+    }
+
+    private boolean hasClassSubjectTeacher(List<Member> teachers, String classCode, String subject) {
+        return teachers.stream().anyMatch(t ->
+                subject.equalsIgnoreCase(t.getSubject())
+                        && t.getAssignedClasses() != null
+                        && t.getAssignedClasses().contains(classCode)
+        );
+    }
+
+    private List<SchoolClass> findClassesMissingSubjectTeacher(List<SchoolClass> classes, List<Member> teachers, String subject) {
+        return classes.stream()
+                .filter(c -> !hasClassSubjectTeacher(teachers, c.getCode(), subject))
+                .toList();
+    }
+
+    private Optional<Member> selectBestCandidateTeacher(List<Member> subjectTeachers, String classCode) {
+        List<Member> availableTeachers = subjectTeachers.stream()
+                .filter(t -> t.getAssignedClasses() == null || !t.getAssignedClasses().contains(classCode))
+                .toList();
+
+        if (availableTeachers.isEmpty()) {
+            return Optional.empty();
+        }
+
+        List<Member> underLimit = availableTeachers.stream()
+                .filter(t -> (t.getAssignedClasses() == null ? 0 : t.getAssignedClasses().size()) < 2)
+                .toList();
+
+        List<Member> pool = !underLimit.isEmpty() ? underLimit : availableTeachers;
+
+        int minClasses = pool.stream()
+                .mapToInt(t -> t.getAssignedClasses() != null ? t.getAssignedClasses().size() : 0)
+                .min()
+                .orElse(0);
+
+        List<Member> candidates = new ArrayList<>(pool.stream()
+                .filter(t -> (t.getAssignedClasses() == null ? 0 : t.getAssignedClasses().size()) == minClasses)
+                .toList());
+
+        Collections.shuffle(candidates);
+        return candidates.isEmpty() ? Optional.empty() : Optional.of(candidates.getFirst());
+    }
+
+    private void assignClassToTeacher(Member teacher, String classCode) {
+        if (teacher.getAssignedClasses() == null) {
+            teacher.setAssignedClasses(new ArrayList<>());
+        }
+        teacher.getAssignedClasses().add(classCode);
     }
 
     @Override
@@ -1160,10 +1195,7 @@ public class SchoolServiceImpl implements SchoolService {
         }
 
         List<SchoolClass> missingClasses = new ArrayList<>(classes.stream()
-                .filter(c -> allTeachers.stream().noneMatch(t ->
-                        subject.equalsIgnoreCase(t.getSubject())
-                                && t.getAssignedClasses() != null
-                                && t.getAssignedClasses().contains(c.getCode()))
+                .filter(c -> !hasClassSubjectTeacher(allTeachers, c.getCode(), subject)
                         && !teacher.getAssignedClasses().contains(c.getCode()))
                 .toList());
 

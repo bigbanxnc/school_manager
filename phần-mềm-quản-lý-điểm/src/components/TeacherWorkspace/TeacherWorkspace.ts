@@ -237,16 +237,16 @@ export default function TeacherWorkspace({ currentUser, gradesMap, setGradesMap 
       }
     }, t('pagination.prev')));
 
-    const PAGE_GROUP_SIZE = 10;
-    const startPage = Math.floor((currentPage - 1) / PAGE_GROUP_SIZE) * PAGE_GROUP_SIZE + 1;
-    const endPage = Math.min(startPage + PAGE_GROUP_SIZE - 1, totalPages);
+    const PAGE_WINDOW = 10;
+    const startPage = currentPage;
+    const endPage = Math.min(currentPage + PAGE_WINDOW - 1, totalPages);
 
     if (startPage > 1) {
       buttons.push(h('button', {
         key: 'group-prev',
         className: 'btn-pagination group-nav',
-        onClick: (e: any) => { e.preventDefault(); onPageChange(startPage - 1); },
-        title: `Về trang ${startPage - 1}`,
+        onClick: (e: any) => { e.preventDefault(); onPageChange(1); },
+        title: 'Về trang 1',
         style: {
           padding: '6px 10px',
           margin: '0 4px',

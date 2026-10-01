@@ -191,35 +191,35 @@ public class GradeSpecification {
         };
     }
 
+    private static final List<String> ALL_SUBJECTS = List.of("math", "literature", "english");
+    private static final List<String> SCORE_TYPES = List.of("oral", "m15", "mid", "final");
+
     private static List<String> getRelevantScoreFields(String searchSubject, String teacherSubject) {
-        String validTs = null;
-        if (teacherSubject != null && !teacherSubject.trim().isEmpty()) {
-            String ts = teacherSubject.trim().toLowerCase();
-            if (java.util.Set.of("math", "literature", "english").contains(ts)) {
-                validTs = ts;
-            }
-        }
+        String validTs = (teacherSubject != null && ALL_SUBJECTS.contains(teacherSubject.trim().toLowerCase()))
+                ? teacherSubject.trim().toLowerCase()
+                : null;
 
         if (validTs != null) {
             if (searchSubject == null || searchSubject.trim().isEmpty()) {
                 return List.of(validTs, "gpa");
             }
             String ss = searchSubject.trim().toLowerCase();
-            return switch (ss) {
-                case "oral" -> List.of(validTs + "_oral");
-                case "m15" -> List.of(validTs + "_m15");
-                case "mid" -> List.of(validTs + "_mid");
-                case "final" -> List.of(validTs + "_final");
-                case "gpa" -> List.of("gpa");
-                default -> {
-                    if (ss.equals(validTs)) yield List.of(validTs);
-                    if (ss.equals(validTs + "oral")) yield List.of(validTs + "_oral");
-                    if (ss.equals(validTs + "m15")) yield List.of(validTs + "_m15");
-                    if (ss.equals(validTs + "mid")) yield List.of(validTs + "_mid");
-                    if (ss.equals(validTs + "final")) yield List.of(validTs + "_final");
-                    yield List.of();
+            if ("gpa".equals(ss)) {
+                return List.of("gpa");
+            }
+            if (SCORE_TYPES.contains(ss)) {
+                return List.of(validTs + "_" + ss);
+            }
+            if (ss.equals(validTs)) {
+                return List.of(validTs);
+            }
+            if (ss.startsWith(validTs)) {
+                String subType = ss.substring(validTs.length()).replace("_", "");
+                if (SCORE_TYPES.contains(subType)) {
+                    return List.of(validTs + "_" + subType);
                 }
-            };
+            }
+            return List.of();
         }
 
         if (searchSubject == null || searchSubject.trim().isEmpty()) {
@@ -227,29 +227,29 @@ public class GradeSpecification {
         }
 
         String ss = searchSubject.trim().toLowerCase();
-        return switch (ss) {
-            case "math" -> List.of("math");
-            case "mathoral" -> List.of("math_oral");
-            case "mathm15" -> List.of("math_m15");
-            case "mathmid" -> List.of("math_mid");
-            case "mathfinal" -> List.of("math_final");
-            case "literature" -> List.of("literature");
-            case "literatureoral" -> List.of("literature_oral");
-            case "literaturem15" -> List.of("literature_m15");
-            case "literaturemid" -> List.of("literature_mid");
-            case "literaturefinal" -> List.of("literature_final");
-            case "english" -> List.of("english");
-            case "englishoral" -> List.of("english_oral");
-            case "englishm15" -> List.of("english_m15");
-            case "englishmid" -> List.of("english_mid");
-            case "englishfinal" -> List.of("english_final");
-            case "oral" -> List.of("math_oral", "literature_oral", "english_oral");
-            case "m15" -> List.of("math_m15", "literature_m15", "english_m15");
-            case "mid" -> List.of("math_mid", "literature_mid", "english_mid");
-            case "final" -> List.of("math_final", "literature_final", "english_final");
-            case "gpa" -> List.of("gpa");
-            default -> isValidGradeField(ss) ? List.of(ss) : List.of();
-        };
+        if ("gpa".equals(ss)) {
+            return List.of("gpa");
+        }
+
+        // Tìm theo loại điểm chung (oral, m15, mid, final) cho cả 3 môn
+        if (SCORE_TYPES.contains(ss)) {
+            return ALL_SUBJECTS.stream().map(sub -> sub + "_" + ss).toList();
+        }
+
+        // Tách môn và loại điểm động
+        for (String subject : ALL_SUBJECTS) {
+            if (ss.equals(subject)) {
+                return List.of(subject);
+            }
+            if (ss.startsWith(subject)) {
+                String subType = ss.substring(subject.length()).replace("_", "");
+                if (SCORE_TYPES.contains(subType)) {
+                    return List.of(subject + "_" + subType);
+                }
+            }
+        }
+
+        return isValidGradeField(ss) ? List.of(ss) : List.of();
     }
 
     private static Predicate buildScorePredicate(Root<Grade> root, CriteriaBuilder cb, String fieldName, String op, double val) {
@@ -303,12 +303,15 @@ public class GradeSpecification {
                     .map(String::trim)
                     .toList();
 
-            if (!validClasses.isEmpty() && hasNullClass) {
-                preds.add(cb.or(member.get("className").in(validClasses), cb.isNull(member.get("className"))));
-            } else if (!validClasses.isEmpty()) {
-                preds.add(member.get("className").in(validClasses));
-            } else if (hasNullClass) {
-                preds.add(cb.isNull(member.get("className")));
+            List<Predicate> classPreds = new ArrayList<>();
+            if (!validClasses.isEmpty()) {
+                classPreds.add(member.get("className").in(validClasses));
+            }
+            if (hasNullClass) {
+                classPreds.add(cb.isNull(member.get("className")));
+            }
+            if (!classPreds.isEmpty()) {
+                preds.add(cb.or(classPreds.toArray(new Predicate[0])));
             }
         }
         return preds;

@@ -206,6 +206,11 @@ export default function LoginPortal({ members, setMembers, setCurrentUser, setAc
     setCpFieldErrors({});
     setCpSuccess('');
 
+    if (cpNewPassword && cpOldPassword && cpNewPassword.trim() === cpOldPassword.trim()) {
+      setCpFieldErrors({ newPassword: 'Mật khẩu mới phải khác mật khẩu hiện tại.' });
+      return;
+    }
+
     setCpLoading(true);
 
     const activeLang = getLanguage();
@@ -288,6 +293,9 @@ export default function LoginPortal({ members, setMembers, setCurrentUser, setAc
             return t('auth.oldPasswordIncorrect');
           }
           if (field === 'newPassword') {
+            if (msg.includes('khác mật khẩu') || msg.includes('phải khác') || msg.includes('different')) {
+              return 'Mật khẩu mới phải khác mật khẩu hiện tại.';
+            }
             if (msg.includes('3 ký tự') || msg.includes('3 characters') || msg.includes('at least 3') || msg.includes('3个字符') || msg.includes('ngắn')) {
               return t('auth.newPasswordMinLength');
             }
@@ -395,7 +403,7 @@ export default function LoginPortal({ members, setMembers, setCurrentUser, setAc
       ),
       h('form', { onSubmit: handleLogin, id: 'form_login_action', noValidate: true },
         h('div', { className: 'form-group' },
-          h('label', { htmlFor: 'login_email_input' }, `${t('table.email')} / Mã tài khoản`),
+          h('label', { htmlFor: 'login_email_input' }, `${t('table.email')} `),
           h('input', {
             type: 'text',
             id: 'login_email_input',
@@ -404,7 +412,7 @@ export default function LoginPortal({ members, setMembers, setCurrentUser, setAc
               setLoginEmail(e.target.value);
               setFieldErrors(prev => ({ ...prev, email: '' }));
             },
-            placeholder: '',
+            placeholder: '••••••••',
             style: fieldErrors.email ? { borderColor: '#ef4444', backgroundColor: '#FEF2F2' } : undefined,
             required: true,
             autoComplete: 'username'
@@ -426,7 +434,7 @@ export default function LoginPortal({ members, setMembers, setCurrentUser, setAc
                 setLoginPassword(e.target.value);
                 setFieldErrors(prev => ({ ...prev, password: '' }));
               },
-              placeholder: '',
+              placeholder: '••••••••',
               style: {
                 width: '100%',
                 paddingRight: '42px',

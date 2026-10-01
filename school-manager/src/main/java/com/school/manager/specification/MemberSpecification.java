@@ -31,18 +31,9 @@ public class MemberSpecification {
             if (hasClasses && classes != null && !classes.isEmpty()) {
                 Predicate classInPredicate = root.get("className").in(classes);
                 if (currentUserId != null && !currentUserId.trim().isEmpty()) {
-                    String trimmedUserId = currentUserId.trim();
-                    Predicate idMatch;
-                    try {
-                        Long numericId = Long.parseLong(trimmedUserId);
-                        idMatch = cb.or(cb.equal(root.get("id"), numericId), cb.equal(cb.lower(root.get("code")), trimmedUserId.toLowerCase()));
-                    } catch (NumberFormatException ignored) {
-                        idMatch = cb.equal(cb.lower(root.get("code")), trimmedUserId.toLowerCase());
-                    }
-
                     Predicate isCurrentTeacher = cb.and(
                             cb.equal(cb.lower(root.get("role")), "teacher"),
-                            idMatch
+                            buildUserMatchPredicate(cb, root, currentUserId.trim())
                     );
                     predicates.add(cb.or(classInPredicate, isCurrentTeacher));
                 } else {
@@ -77,5 +68,14 @@ public class MemberSpecification {
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    private static Predicate buildUserMatchPredicate(CriteriaBuilder cb, Root<Member> root, String userId) {
+        try {
+            Long numericId = Long.parseLong(userId);
+            return cb.or(cb.equal(root.get("id"), numericId), cb.equal(cb.lower(root.get("code")), userId.toLowerCase()));
+        } catch (NumberFormatException ignored) {
+            return cb.equal(cb.lower(root.get("code")), userId.toLowerCase());
+        }
     }
 }

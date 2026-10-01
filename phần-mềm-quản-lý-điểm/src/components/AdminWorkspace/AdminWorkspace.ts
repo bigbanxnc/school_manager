@@ -572,7 +572,7 @@ export default function AdminWorkspace({
       if (res.ok) {
         const data = await res.json();
         const newPassword = data.newPassword || data.password;
-        setMembers(prev => prev.map(m => {
+        const updateMemberItem = (m: Member) => {
           if (m.id === target.id || m.code === target.code || (target.email && m.email === target.email)) {
             return {
               ...m,
@@ -581,13 +581,17 @@ export default function AdminWorkspace({
             };
           }
           return m;
-        }));
+        };
+        setMembers(prev => prev.map(updateMemberItem));
+        setPaginatedMembers(prev => prev.map(updateMemberItem));
+        setPaginatedTeachers(prev => prev.map(updateMemberItem));
         setResetModalData(prev => ({
           ...prev,
           loading: false,
           rawPassword: newPassword,
           copied: false
         }));
+        setRefreshTrigger(prev => prev + 1);
         return;
       }
     } catch (err) {
@@ -605,7 +609,7 @@ export default function AdminWorkspace({
       });
     } catch (_) {}
 
-    setMembers(prev => prev.map(m => {
+    const updateFallbackItem = (m: Member) => {
       if (m.id === target.id || m.code === target.code || (target.email && m.email === target.email)) {
         return {
           ...m,
@@ -614,7 +618,11 @@ export default function AdminWorkspace({
         };
       }
       return m;
-    }));
+    };
+    setMembers(prev => prev.map(updateFallbackItem));
+    setPaginatedMembers(prev => prev.map(updateFallbackItem));
+    setPaginatedTeachers(prev => prev.map(updateFallbackItem));
+    setRefreshTrigger(prev => prev + 1);
     setResetModalData(prev => ({
       ...prev,
       loading: false,
@@ -878,16 +886,16 @@ export default function AdminWorkspace({
       }
     }, t('pagination.prev')));
 
-    const PAGE_GROUP_SIZE = 10;
-    const startPage = Math.floor((currentPage - 1) / PAGE_GROUP_SIZE) * PAGE_GROUP_SIZE + 1;
-    const endPage = Math.min(startPage + PAGE_GROUP_SIZE - 1, totalPages);
+    const PAGE_WINDOW = 10;
+    const startPage = currentPage;
+    const endPage = Math.min(currentPage + PAGE_WINDOW - 1, totalPages);
 
     if (startPage > 1) {
       buttons.push(h('button', {
         key: 'group-prev',
         className: 'btn-pagination group-nav',
-        onClick: (e: any) => { e.preventDefault(); onPageChange(startPage - 1); },
-        title: `Về trang ${startPage - 1}`,
+        onClick: (e: any) => { e.preventDefault(); onPageChange(1); },
+        title: 'Về trang 1',
         style: {
           padding: '6px 10px',
           margin: '0 4px',
@@ -1141,7 +1149,8 @@ export default function AdminWorkspace({
       suggestedId = `HS${String(maxNum + 1).padStart(3, '0')}`;
     }
 
-    setStudentForm({ id: suggestedId, name: '', email: suggestedId.toLowerCase(), password: '123', className: classes[0]?.id || '' });
+    const autoGenStudentPassword = generateSecureRandomPassword(10);
+    setStudentForm({ id: suggestedId, name: '', email: suggestedId.toLowerCase(), password: autoGenStudentPassword, className: classes[0]?.id || '' });
     setShowStudentModal(true);
   };
 
@@ -1173,6 +1182,7 @@ export default function AdminWorkspace({
 
     const finalStudentForm: Member = { ...studentForm, email: fullStudentEmail, role: 'student' };
 
+    let savedData: any = null;
     try {
       const endpoint = editingStudent ? `/api/students/${editingStudent.id}` : '/api/students';
       const method = editingStudent ? 'PUT' : 'POST';
@@ -1183,27 +1193,32 @@ export default function AdminWorkspace({
         body: JSON.stringify(finalStudentForm)
       });
       if (res.ok) {
-        console.log('[API Network Success] Đã lưu thông tin học sinh lên hệ thống server.');
+        savedData = await res.json().catch(() => null);
+        console.log('[API Network Success] Đã lưu thông tin học sinh lên hệ thống server.', savedData);
       }
     } catch (err) {
       console.warn('[API Network Simulated fallback] Đang chạy offline hoặc lỗi server. Đồng bộ LocalState.', err);
     }
 
+    const effectiveStudent: Member = savedData ? { ...finalStudentForm, ...savedData } : finalStudentForm;
+
     if (editingStudent) {
-      setMembers(prev => prev.map(m => m.id === editingStudent.id ? { ...m, ...finalStudentForm } : m));
-      if (!finalStudentForm.className || finalStudentForm.className.trim() === '') {
+      setMembers(prev => prev.map(m => m.id === editingStudent.id ? { ...m, ...effectiveStudent } : m));
+      setPaginatedMembers(prev => prev.map(m => m.id === editingStudent.id ? { ...m, ...effectiveStudent } : m));
+      if (!effectiveStudent.className || effectiveStudent.className.trim() === '') {
         setGradesMap(prev => ({
           ...prev,
-          [finalStudentForm.id]: { math: null, literature: null, english: null }
+          [effectiveStudent.id]: { math: null, literature: null, english: null }
         }));
       }
     } else {
-      if (members.some(m => m.id === finalStudentForm.id)) {
+      if (members.some(m => m.id === effectiveStudent.id)) {
         alert(t('admin.alerts.studentExists'));
         return;
       }
-      setMembers(prev => [...prev, finalStudentForm]);
-      setGradesMap(prev => ({ ...prev, [finalStudentForm.id]: { math: null, literature: null, english: null } }));
+      setMembers(prev => [...prev, effectiveStudent]);
+      setPaginatedMembers(prev => [effectiveStudent, ...prev]);
+      setGradesMap(prev => ({ ...prev, [effectiveStudent.id]: { math: null, literature: null, english: null } }));
     }
     setShowStudentModal(false);
     setRefreshTrigger(prev => prev + 1);
@@ -2041,7 +2056,7 @@ export default function AdminWorkspace({
                         } as Member);
                         openResetPasswordModal(s);
                       },
-                      title: 'Reset mật khẩu (ngẫu nhiên 10 ký tự)'
+                      title: 'Reset mật khẩu '
                     }, '🔑') : null,
                     canManageMembers ? h('button', { className: 'icon-action-btn delete', onClick: () => deleteStudent(r.studentId), title: t('admin.tooltips.deleteStudentAndGrades') }, '🗑️') : null
                   )
@@ -2151,7 +2166,7 @@ export default function AdminWorkspace({
                   canManageMembers ? h('button', {
                     className: 'icon-action-btn edit',
                     onClick: () => openResetPasswordModal(m),
-                    title: 'Reset mật khẩu (ngẫu nhiên 10 ký tự)'
+                    title: 'Reset mật khẩu '
                   }, '🔑') : null
                 )
               )
@@ -2491,12 +2506,30 @@ export default function AdminWorkspace({
               )
             ),
             h('div', { className: 'modal-form-group' },
-              h('label', null, t('table.password')),
+              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } },
+                h('label', { style: { margin: 0 } }, t('table.password')),
+                h('button', {
+                  type: 'button',
+                  onClick: () => setStudentForm(prev => ({ ...prev, password: generateSecureRandomPassword(10) })),
+                  title: 'Tự sinh mật khẩu 10 ký tự bảo mật cao (chữ hoa, chữ thường, số)',
+                  style: {
+                    background: 'none',
+                    border: 'none',
+                    color: '#2563EB',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    padding: '2px 6px'
+                  }
+                }, '🔄 Sinh ngẫu nhiên (10 ký tự)')
+              ),
               h('input', {
                 type: 'text',
                 value: studentForm.password,
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) => setStudentForm(prev => ({ ...prev, password: e.target.value })),
-                required: true
+                placeholder: 'Mật khẩu học sinh (tối thiểu 6 ký tự)',
+                required: true,
+                style: { fontFamily: 'monospace', letterSpacing: '1px' }
               })
             ),
             h('div', { className: 'modal-form-group' },
@@ -2941,7 +2974,7 @@ export default function AdminWorkspace({
       return h('div', { className: 'modal-backdrop', style: { zIndex: 9999 } },
         h('div', { className: 'modal-card', style: { maxWidth: '520px', width: '90%' } },
           h('div', { className: 'modal-header' },
-            h('h3', null, '🔑 Reset Mật Khẩu Tài Khoản'),
+            h('h3', null, '🔑 Reset Mật Khẩu '),
             h('button', {
               className: 'btn-close-modal',
               onClick: () => setResetModalData({ show: false, user: null })
@@ -2949,9 +2982,7 @@ export default function AdminWorkspace({
           ),
           h('div', { className: 'modal-body', style: { padding: '24px' } },
             !resetModalData.rawPassword ? h(React.Fragment, null,
-              h('p', { style: { fontSize: '0.95rem', color: '#334155', marginBottom: '16px' } },
-                'Bạn có chắc chắn muốn đặt lại (reset) mật khẩu cho tài khoản dưới đây không?'
-              ),
+              
               h('div', {
                 style: {
                   backgroundColor: '#F8FAFC',
@@ -2966,17 +2997,7 @@ export default function AdminWorkspace({
                 h('div', { style: { marginBottom: '6px' } }, h('strong', null, 'Email: '), targetUser.email),
                 h('div', null, h('strong', null, 'Vai trò: '), formatRole(targetUser.role || 'student'))
               ),
-              h('div', {
-                style: {
-                  padding: '12px',
-                  borderRadius: '8px',
-                  backgroundColor: '#EFF6FF',
-                  border: '1px solid #BFDBFE',
-                  color: '#1E40AF',
-                  fontSize: '0.88rem',
-                  lineHeight: '1.4'
-                }
-              }, '🔒 Hệ thống sẽ sử dụng thuật toán SecureRandom sinh mật khẩu ngẫu nhiên có độ dài đúng 10 ký tự (đảm bảo luôn chứa tối thiểu 1 chữ thường a-z, 1 chữ hoa A-Z và 1 chữ số 0-9). Người dùng sẽ sử dụng mật khẩu mới này để đăng nhập.')
+              
             ) : h(React.Fragment, null,
               h('div', {
                 style: {
@@ -2989,10 +3010,10 @@ export default function AdminWorkspace({
                   color: '#065F46',
                   fontWeight: 600
                 }
-              }, '🎉 Mật khẩu đã được Reset thành công bằng SecureRandom!'),
+              }, 'Mật khẩu đã được thay đổi'),
 
               h('div', { style: { marginBottom: '8px', fontSize: '0.9rem', color: '#475569' } },
-                `Mật khẩu mới (10 ký tự) của ${formatUserName(targetUser)} (${targetUser.code || targetUser.id}):`
+                `Mật khẩu mới của ${formatUserName(targetUser)} (${targetUser.code || targetUser.id}):`
               ),
 
               h('div', {
@@ -3059,9 +3080,10 @@ export default function AdminWorkspace({
                     whiteSpace: 'nowrap',
                     transition: 'background-color 0.2s ease'
                   }
-                }, resetModalData.copied ? 'Đã copy! ✓' : 'Copy mật khẩu 📋')
+                }, resetModalData.copied ? 'Đã copy! ' : 'Copy mật khẩu ')
               ),
 
+              
             )
           ),
           h('div', { className: 'modal-footer' },
@@ -3078,7 +3100,7 @@ export default function AdminWorkspace({
                 onClick: () => confirmResetPassword(),
                 disabled: resetModalData.loading,
                 style: { backgroundColor: '#B91C1C', borderColor: '#B91C1C' }
-              }, resetModalData.loading ? 'Đang tạo...' : 'Sinh mật khẩu ngẫu nhiên ')
+              }, resetModalData.loading ? 'Đang tạo...' : 'Mật khẩu mới')
             ) : h('button', {
               type: 'button',
               className: 'btn btn-primary',

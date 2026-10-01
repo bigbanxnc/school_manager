@@ -1,5 +1,5 @@
-
-FROM amazoncorretto:26 AS build
+# Stage 1: Build ứng dụng với Java 21
+FROM amazoncorretto:21 AS build
 WORKDIR /app
 RUN yum install -y tar gzip
 COPY .mvn/ .mvn
@@ -8,8 +8,8 @@ RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
 COPY src ./src
 RUN ./mvnw package -DskipTests
 
-
-FROM amazoncorretto:26-alpine
+# Stage 2: Runtime siêu nhẹ với Java 21 Alpine
+FROM amazoncorretto:21-alpine
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080

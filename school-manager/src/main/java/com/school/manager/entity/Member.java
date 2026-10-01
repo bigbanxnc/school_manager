@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+
 @Entity
 @Table(name = "members", indexes = {
         @Index(name = "idx_member_code", columnList = "code", unique = true)
@@ -49,7 +50,7 @@ public class Member {
     public void deserializeId(Object val) {
         if (val instanceof Number num) {
             this.id = num.longValue();
-        } else if (val instanceof String s) {
+        } else if (val instanceof String s && !s.trim().isEmpty()) {
             try {
                 this.id = Long.parseLong(s.trim());
             } catch (NumberFormatException ignored) {
@@ -80,26 +81,30 @@ public class Member {
         if (this.mustChangePassword == null) {
             this.mustChangePassword = false;
         }
+        if (this.role == null || this.role.trim().isEmpty()) {
+            this.role = "student";
+        }
+        String normalizedRole = this.role.trim().toLowerCase();
         if (this.code == null || this.code.trim().isEmpty()) {
-            String prefix = "student".equalsIgnoreCase(this.role) ? "HS" : ("teacher".equalsIgnoreCase(this.role) ? "GV" : "AD");
+            String prefix = switch (normalizedRole) {
+                case "teacher" -> "GV";
+                case "admin" -> "AD";
+                default -> "HS";
+            };
             this.code = prefix + (System.currentTimeMillis() % 100000);
         }
         if (this.email == null || this.email.trim().isEmpty()) {
             this.email = this.code.toLowerCase() + "@school.com";
         }
-        if (this.role == null || this.role.trim().isEmpty()) {
-            this.role = "student";
-        }
         if (this.password == null || this.password.trim().isEmpty()) {
-            if ("admin".equalsIgnoreCase(this.role)) {
-                this.password = "admin123";
-            } else if ("teacher".equalsIgnoreCase(this.role)) {
-                this.password = "teacher123";
-            } else {
-                this.password = "hs123";
-            }
+            this.password = switch (normalizedRole) {
+                case "admin" -> "admin123";
+                case "teacher" -> "teacher123";
+                default -> "hs123";
+            };
         }
         this.password = com.school.manager.util.PasswordUtil.ensureSha1(this.password);
+
         if (this.name == null || this.name.trim().isEmpty()) {
             this.name = "Thành viên " + this.code;
         }

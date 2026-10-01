@@ -204,103 +204,11 @@ public class DatabaseSeeder {
                 }
             }
 
-            if (memberRepo.count() > 0 || classRepo.count() > 0) {
+            long memberCount = memberRepo.count();
+            long classCount = classRepo.count();
+            if (memberCount > 0 || classCount > 0) {
                 log.info("[DB Seeder] Cơ sở dữ liệu đã có sẵn dữ liệu ({} thành viên, {} lớp học). Giữ nguyên dữ liệu hiện tại.",
-                        memberRepo.count(), classRepo.count());
-
-                // Tự động kiểm tra và mã hóa toàn bộ mật khẩu cũ chưa băm (như hs123, teacher123) sang SHA-1
-                List<Member> unhashedMembers = new ArrayList<>();
-                for (Member m : memberRepo.findAll()) {
-                    boolean modified = false;
-                    if (m.getPassword() != null && !com.school.manager.util.PasswordUtil.isSha1(m.getPassword())) {
-                        m.setPassword(com.school.manager.util.PasswordUtil.ensureSha1(m.getPassword()));
-                        modified = true;
-                    }
-                    if (m.getMustChangePassword() == null) {
-                        m.setMustChangePassword(false);
-                        modified = true;
-                    }
-                    if (modified) {
-                        unhashedMembers.add(m);
-                    }
-                }
-                if (!unhashedMembers.isEmpty()) {
-                    memberRepo.saveAll(unhashedMembers);
-                    log.info("[DB Seeder] Đã tự động băm SHA-1 cho {} tài khoản chưa được mã hóa!", unhashedMembers.size());
-                }
-
-                // Tự động kiểm tra và cập nhật các điểm phụ (miệng, 15p, giữa kỳ, cuối kỳ) và studentCode nếu đang bị NULL
-                if (dbData != null && dbData.getGrades() != null && gradeRepo.count() > 0) {
-                    boolean hasMissingData = gradeRepo.findAll().stream()
-                            .anyMatch(g -> (g.getMath() != null && g.getMath_oral() == null) || g.getStudentCode() == null);
-                    if (hasMissingData) {
-                        log.info("[DB Seeder] Đang tự động bổ sung studentCode và dữ liệu điểm thành phần từ db.json...");
-                        java.util.Map<String, Long> codeToSid = new java.util.HashMap<>();
-                        for (Member m : memberRepo.findAll()) {
-                            if (m.getCode() != null && m.getId() != null) {
-                                codeToSid.put(m.getCode().trim().toLowerCase(), m.getId());
-                            }
-                        }
-                        java.util.Map<String, Grade> existingGradeMap = new java.util.HashMap<>();
-                        for (Grade g : gradeRepo.findAll()) {
-                            if (g.getStudentId() != null) {
-                                existingGradeMap.put(g.getStudentId().trim().toLowerCase(), g);
-                            }
-                            if (g.getStudentCode() != null) {
-                                existingGradeMap.put(g.getStudentCode().trim().toLowerCase(), g);
-                            }
-                        }
-                        List<Grade> toUpdate = new ArrayList<>();
-                        for (RawGrade rg : dbData.getGrades()) {
-                            String studentCode = rg.getStudentId();
-                            if (studentCode == null || studentCode.trim().isEmpty()) {
-                                studentCode = rg.getId();
-                            }
-                            if (studentCode != null) {
-                                String cleanCode = studentCode.trim().toLowerCase();
-                                Grade eg = existingGradeMap.get(cleanCode);
-                                if (eg == null) {
-                                    Long sid = codeToSid.get(cleanCode);
-                                    if (sid != null) {
-                                        eg = existingGradeMap.get(String.valueOf(sid));
-                                    }
-                                }
-                                if (eg != null) {
-                                    boolean modified = false;
-                                    if (eg.getStudentCode() == null) {
-                                        eg.setStudentCode(studentCode.trim().toUpperCase());
-                                        modified = true;
-                                    }
-                                    if (eg.getMath_oral() == null && rg.getMathOral() != null) {
-                                        eg.setMath_oral(rg.getMathOral());
-                                        eg.setMath_m15(rg.getMathM15());
-                                        eg.setMath_mid(rg.getMathMid());
-                                        eg.setMath_final(rg.getMathFinal());
-                                        eg.setLiterature_oral(rg.getLiteratureOral());
-                                        eg.setLiterature_m15(rg.getLiteratureM15());
-                                        eg.setLiterature_mid(rg.getLiteratureMid());
-                                        eg.setLiterature_final(rg.getLiteratureFinal());
-                                        eg.setEnglish_oral(rg.getEnglishOral());
-                                        eg.setEnglish_m15(rg.getEnglishM15());
-                                        eg.setEnglish_mid(rg.getEnglishMid());
-                                        eg.setEnglish_final(rg.getEnglishFinal());
-                                        if (eg.getGpa() == null) {
-                                            eg.setGpa(rg.getGpa());
-                                        }
-                                        modified = true;
-                                    }
-                                    if (modified) {
-                                        toUpdate.add(eg);
-                                    }
-                                }
-                            }
-                        }
-                        if (!toUpdate.isEmpty()) {
-                            gradeRepo.saveAll(toUpdate);
-                            log.info("[DB Seeder] Đã bổ sung thành công studentCode và điểm phụ cho {} bản ghi học sinh!", toUpdate.size());
-                        }
-                    }
-                }
+                        memberCount, classCount);
                 return;
             }
 
@@ -379,47 +287,30 @@ public class DatabaseSeeder {
                     log.info("[DB Seeder] Đã nạp {} thành viên (giáo viên, học sinh, admin).", entityMembers.size());
                 }
 
-                java.util.Map<String, Long> codeToStudentId = new java.util.HashMap<>();
-                for (Member m : memberRepo.findAll()) {
-                    if (m.getCode() != null && m.getId() != null) {
-                        codeToStudentId.put(m.getCode().toLowerCase(), m.getId());
-                    }
-                }
-
                 if (dbData.getGrades() != null) {
                     List<Grade> validGrades = new ArrayList<>();
                     for (RawGrade rg : dbData.getGrades()) {
-                        String studentCode = rg.getStudentId();
-                        if (studentCode == null || studentCode.trim().isEmpty()) {
-                            studentCode = rg.getId();
+                        String studentCode = resolveStudentCode(rg);
+                        if (studentCode == null) {
+                            continue;
                         }
-                        Long sid = null;
-                        if (studentCode != null) {
-                            sid = codeToStudentId.get(studentCode.trim().toLowerCase());
+
+                        String studentCodeUpper = studentCode.toUpperCase();
+                        Grade g = Grade.builder()
+                                .studentId(studentCodeUpper)
+                                .studentCode(studentCodeUpper)
+                                .build();
+                        copyScoresFromRawGrade(g, rg);
+                        // Đồng bộ tính toán điểm qua ScoreUtil
+                        if (g.getMath_oral() == null && rg.getMath() != null) {
+                            g.setMath(rg.getMath());
+                            g.setLiterature(rg.getLiterature());
+                            g.setEnglish(rg.getEnglish());
+                            g.setGpa(rg.getGpa());
+                        } else {
+                            g.calculateDerivedScores();
                         }
-                        if (sid != null) {
-                            Grade g = Grade.builder()
-                                    .studentId(sid)
-                                    .studentCode(studentCode.trim().toUpperCase())
-                                    .math(rg.getMath())
-                                    .literature(rg.getLiterature())
-                                    .english(rg.getEnglish())
-                                    .math_oral(rg.getMathOral())
-                                    .math_m15(rg.getMathM15())
-                                    .math_mid(rg.getMathMid())
-                                    .math_final(rg.getMathFinal())
-                                    .literature_oral(rg.getLiteratureOral())
-                                    .literature_m15(rg.getLiteratureM15())
-                                    .literature_mid(rg.getLiteratureMid())
-                                    .literature_final(rg.getLiteratureFinal())
-                                    .english_oral(rg.getEnglishOral())
-                                    .english_m15(rg.getEnglishM15())
-                                    .english_mid(rg.getEnglishMid())
-                                    .english_final(rg.getEnglishFinal())
-                                    .gpa(rg.getGpa())
-                                    .build();
-                            validGrades.add(g);
-                        }
+                        validGrades.add(g);
                     }
                     gradeRepo.saveAll(validGrades);
                     log.info("[DB Seeder] Đã nạp {} điểm số của học sinh.", validGrades.size());
@@ -427,8 +318,18 @@ public class DatabaseSeeder {
                 List<Member> students = memberRepo.findByRole("student");
                 List<Grade> missingGrades = new ArrayList<>();
                 for (Member s : students) {
-                    if (s.getId() != null && !gradeRepo.existsByStudentId(s.getId())) {
-                        missingGrades.add(Grade.builder().studentId(s.getId()).studentCode(s.getCode()).build());
+                    boolean gradeExists = (s.getCode() != null && gradeRepo.existsByStudentCodeIgnoreCase(s.getCode()))
+                            || (s.getId() != null && gradeRepo.existsByStudentId(s.getId()));
+                    if (!gradeExists) {
+                        String sCode = (s.getCode() != null && !s.getCode().trim().isEmpty())
+                                ? s.getCode().trim().toUpperCase()
+                                : (s.getId() != null ? String.valueOf(s.getId()) : null);
+                        if (sCode != null) {
+                            missingGrades.add(Grade.builder()
+                                    .studentId(sCode)
+                                    .studentCode(sCode)
+                                    .build());
+                        }
                     }
                 }
                 if (!missingGrades.isEmpty()) {
@@ -442,15 +343,37 @@ public class DatabaseSeeder {
         };
     }
 
+    private String resolveStudentCode(RawGrade rg) {
+        String studentCode = rg.getStudentId();
+        if (studentCode == null || studentCode.trim().isEmpty()) {
+            studentCode = rg.getId();
+        }
+        return (studentCode != null && !studentCode.trim().isEmpty()) ? studentCode.trim() : null;
+    }
+
+    private void copyScoresFromRawGrade(Grade target, RawGrade source) {
+        target.setMath_oral(source.getMathOral());
+        target.setMath_m15(source.getMathM15());
+        target.setMath_mid(source.getMathMid());
+        target.setMath_final(source.getMathFinal());
+        target.setLiterature_oral(source.getLiteratureOral());
+        target.setLiterature_m15(source.getLiteratureM15());
+        target.setLiterature_mid(source.getLiteratureMid());
+        target.setLiterature_final(source.getLiteratureFinal());
+        target.setEnglish_oral(source.getEnglishOral());
+        target.setEnglish_m15(source.getEnglishM15());
+        target.setEnglish_mid(source.getEnglishMid());
+        target.setEnglish_final(source.getEnglishFinal());
+    }
+
     private String resolveDefaultPassword(String rawPassword, String role) {
         if (rawPassword != null && !rawPassword.trim().isEmpty()) {
             return rawPassword;
         }
-        if ("admin".equalsIgnoreCase(role)) {
-            return "admin123";
-        } else if ("teacher".equalsIgnoreCase(role)) {
-            return "teacher123";
-        }
-        return "hs123";
+        return switch (role != null ? role.trim().toLowerCase() : "") {
+            case "admin" -> "admin123";
+            case "teacher" -> "teacher123";
+            default -> "hs123";
+        };
     }
 }

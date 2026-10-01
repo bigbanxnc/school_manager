@@ -11,12 +11,12 @@ import java.util.Optional;
 @Repository
 public interface SchoolClassRepository extends JpaRepository<SchoolClass, Long> {
 
-    Optional<SchoolClass> findByCode(String code);
-
     @Query("SELECT s FROM SchoolClass s WHERE LOWER(s.code) = LOWER(:code)")
     Optional<SchoolClass> findByCodeIgnoreCase(@Param("code") String code);
 
     boolean existsByCodeIgnoreCase(String code);
+
+    boolean existsByCode(String code);
 
     default Optional<SchoolClass> findByIdOrCode(String idOrCode) {
         if (idOrCode == null || idOrCode.trim().isEmpty()) {

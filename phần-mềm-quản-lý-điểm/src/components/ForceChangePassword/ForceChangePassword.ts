@@ -55,6 +55,11 @@ export default function ForceChangePassword({
       return;
     }
 
+    if (trimmedNew === trimmedOld) {
+      setErrorMessage('Mật khẩu mới phải khác mật khẩu hiện tại!');
+      return;
+    }
+
     if (trimmedNew !== trimmedConfirm) {
       setErrorMessage('Xác nhận mật khẩu mới không khớp!');
       return;
