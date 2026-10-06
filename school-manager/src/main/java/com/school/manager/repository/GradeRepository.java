@@ -15,71 +15,18 @@ import java.util.Optional;
 @Repository
 public interface GradeRepository extends JpaRepository<Grade, Long>, JpaSpecificationExecutor<Grade> {
 
-    @Query("SELECT g FROM Grade g WHERE LOWER(g.studentCode) = LOWER(:code) OR LOWER(g.studentId) = LOWER(:code)")
-    Optional<Grade> findByStudentCodeIgnoreCase(@Param("code") String code);
+    Optional<Grade> findByStudentId(Long studentId);
 
-    @Query("SELECT g FROM Grade g WHERE g.studentId = :studentId OR LOWER(g.studentCode) = LOWER(:studentId)")
-    Optional<Grade> findByStudentIdStr(@Param("studentId") String studentId);
+    Optional<Grade> findByStudentCodeIgnoreCase(String studentCode);
 
-    @Query("SELECT COUNT(g) > 0 FROM Grade g WHERE LOWER(g.studentCode) = LOWER(:code) OR LOWER(g.studentId) = LOWER(:code)")
-    boolean existsByStudentCodeIgnoreCase(@Param("code") String code);
+    boolean existsByStudentId(Long studentId);
 
-    @Query("SELECT COUNT(g) > 0 FROM Grade g WHERE g.studentId = :studentId OR LOWER(g.studentCode) = LOWER(:studentId)")
-    boolean existsByStudentIdStr(@Param("studentId") String studentId);
-
-    default Optional<Grade> findByStudentIdOrCode(String idOrCode) {
-        if (idOrCode == null || idOrCode.trim().isEmpty()) {
-            return Optional.empty();
-        }
-        String trimmed = idOrCode.trim();
-        Optional<Grade> byCode = findByStudentCodeIgnoreCase(trimmed);
-        if (byCode.isPresent()) {
-            return byCode;
-        }
-        try {
-            Long.parseLong(trimmed);
-            return findByStudentIdStr(trimmed);
-        } catch (NumberFormatException ignored) {
-            return Optional.empty();
-        }
-    }
-
-    default Optional<Grade> findByStudentId(Long studentId) {
-        return studentId == null ? Optional.empty() : findByStudentIdStr(String.valueOf(studentId));
-    }
-
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    default boolean existsByStudentId(Long studentId) {
-        return studentId != null && existsByStudentIdStr(String.valueOf(studentId));
-    }
-
-    @Modifying
-    @Transactional
-    @Query("DELETE FROM Grade g WHERE LOWER(g.studentCode) = LOWER(:code)")
-    void deleteByStudentCode(@Param("code") String code);
+    boolean existsByStudentCodeIgnoreCase(String studentCode);
 
     @Modifying
     @Transactional
     @Query("DELETE FROM Grade g WHERE g.studentId = :studentId")
-    void deleteByStudentIdStr(@Param("studentId") String studentId);
-
-    default void deleteByStudentIdOrCode(String idOrCode) {
-        if (idOrCode == null || idOrCode.trim().isEmpty()) {
-            return;
-        }
-        String trimmed = idOrCode.trim();
-        deleteByStudentCode(trimmed);
-        try {
-            Long.parseLong(trimmed);
-            deleteByStudentIdStr(trimmed);
-        } catch (NumberFormatException ignored) {}
-    }
-
-    default void deleteByStudentId(Long studentId) {
-        if (studentId != null) {
-            deleteByStudentIdOrCode(String.valueOf(studentId));
-        }
-    }
+    void deleteByStudentId(@Param("studentId") Long studentId);
 
     @Query("SELECT g FROM Grade g WHERE g.math >= :minScore")
     List<Grade> findExcellentMathStudents(@Param("minScore") Double minScore);
@@ -93,5 +40,3 @@ public interface GradeRepository extends JpaRepository<Grade, Long>, JpaSpecific
     @Query("SELECT g FROM Grade g WHERE g.math IS NOT NULL AND g.literature IS NOT NULL AND g.english IS NOT NULL")
     List<Grade> findStudentsWithCompleteGrades();
 }
-
-

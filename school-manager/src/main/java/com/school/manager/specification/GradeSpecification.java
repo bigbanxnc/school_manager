@@ -55,18 +55,20 @@ public class GradeSpecification {
 
             List<Predicate> predicates = new ArrayList<>();
 
+
             Subquery<String> codeSubquery = query.subquery(String.class);
             Root<Member> member = codeSubquery.from(Member.class);
             codeSubquery.select(member.get("code"));
             codeSubquery.where(cb.and(buildMemberClassAndRolePredicates(cb, member, classes).toArray(new Predicate[0])));
 
-            Subquery<String> idSubquery = query.subquery(String.class);
+
+            Subquery<Long> idSubquery = query.subquery(Long.class);
             Root<Member> memberId = idSubquery.from(Member.class);
-            idSubquery.select(memberId.get("id").as(String.class));
+            idSubquery.select(memberId.get("id"));
             idSubquery.where(cb.and(buildMemberClassAndRolePredicates(cb, memberId, classes).toArray(new Predicate[0])));
 
+
             predicates.add(cb.or(
-                    root.get("studentId").in(codeSubquery),
                     root.get("studentId").in(idSubquery),
                     root.get("studentCode").in(codeSubquery)
             ));
@@ -139,15 +141,15 @@ public class GradeSpecification {
                 textCodeSubquery.select(textMemberCode.get("code"));
                 textCodeSubquery.where(cb.or(buildSearchMemberPredicates(cb, textMemberCode, rawLower, remainingText, rawSearch, matcher).toArray(new Predicate[0])));
 
-                Subquery<String> textIdSubquery = query.subquery(String.class);
+                Subquery<Long> textIdSubquery = query.subquery(Long.class);
                 Root<Member> textMemberId = textIdSubquery.from(Member.class);
-                textIdSubquery.select(textMemberId.get("id").as(String.class));
+                textIdSubquery.select(textMemberId.get("id"));
                 textIdSubquery.where(cb.or(buildSearchMemberPredicates(cb, textMemberId, rawLower, remainingText, rawSearch, matcher).toArray(new Predicate[0])));
 
-                searchPredicates.add(root.get("studentId").in(textCodeSubquery));
                 searchPredicates.add(root.get("studentId").in(textIdSubquery));
                 searchPredicates.add(root.get("studentCode").in(textCodeSubquery));
-                searchPredicates.add(cb.like(cb.lower(root.get("studentId")), "%" + rawLower + "%"));
+                // Ép studentId sang String trước khi so sánh chuỗi LIKE thay vì gọi cb.lower trực tiếp
+                searchPredicates.add(cb.like(root.get("studentId").as(String.class), "%" + rawLower + "%"));
                 searchPredicates.add(cb.like(cb.lower(root.get("studentCode")), "%" + rawLower + "%"));
 
                 predicates.add(cb.or(searchPredicates.toArray(new Predicate[0])));
@@ -231,12 +233,10 @@ public class GradeSpecification {
             return List.of("gpa");
         }
 
-        // Tìm theo loại điểm chung (oral, m15, mid, final) cho cả 3 môn
         if (SCORE_TYPES.contains(ss)) {
             return ALL_SUBJECTS.stream().map(sub -> sub + "_" + ss).toList();
         }
 
-        // Tách môn và loại điểm động
         for (String subject : ALL_SUBJECTS) {
             if (ss.equals(subject)) {
                 return List.of(subject);

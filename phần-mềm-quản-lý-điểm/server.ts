@@ -371,6 +371,13 @@ app.use('/api', async (req, res, next) => {
     
     if (!response.ok) {
       updateBackendState('error', response.status);
+      let errorText = '';
+      try {
+        errorText = await response.clone().text();
+      } catch (_) {}
+      if (errorText) {
+        console.log(`  \x1b[31m[Backend Error Detail]\x1b[0m ${errorText.substring(0, 300)}`);
+      }
       if (req.method === 'GET' || response.status === 404 || response.status === 405 || response.status === 500 || req.originalUrl.includes('/permissions') || req.originalUrl.includes('/change-password')) {
         console.log(`  \x1b[33m[Fallback]\x1b[0m Spring Boot trả về lỗi ${response.status} cho ${req.method} ${req.originalUrl}. Chuyển sang xử lý bằng db.json Mock.`);
         return next();

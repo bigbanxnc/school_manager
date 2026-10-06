@@ -1,7 +1,8 @@
 package com.school.manager.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonSetter;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,8 +22,13 @@ public class MemberDto {
     @JsonProperty("code")
     private String code;
 
+    @NotBlank(message = "Tên không được để trống")
     private String name;
+
+    @NotBlank(message = "Email không được để trống")
+    @Email(message = "Email không đúng định dạng")
     private String email;
+
     private String password;
     private String role;
 
@@ -38,20 +44,5 @@ public class MemberDto {
 
     public List<String> getAssignedClasses() {
         return assignedClasses != null ? assignedClasses : new ArrayList<>();
-    }
-
-    @JsonSetter("id")
-    public void setIdFromJson(Object val) {
-        if (val instanceof Number num) {
-            this.id = num.longValue();
-        } else if (val instanceof String s && !s.trim().isEmpty()) {
-            try {
-                this.id = Long.parseLong(s.trim());
-            } catch (NumberFormatException e) {
-                if (this.code == null || this.code.trim().isEmpty()) {
-                    this.code = s.trim();
-                }
-            }
-        }
     }
 }

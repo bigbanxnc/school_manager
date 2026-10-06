@@ -1,9 +1,11 @@
 package com.school.manager.controller;
 
+import com.school.manager.constant.RoleConstants;
 import com.school.manager.dto.ChangePasswordRequestDto;
 import com.school.manager.dto.GradeDto;
 import com.school.manager.dto.LoginRequestDto;
 import com.school.manager.dto.MemberDto;
+import com.school.manager.dto.PageResponse;
 import com.school.manager.dto.SchoolClassDto;
 import com.school.manager.exception.GlobalExceptionHandler.AppException;
 import com.school.manager.service.SchoolService;
@@ -50,7 +52,7 @@ public class SchoolController {
     }
 
     @GetMapping("/members")
-    public ResponseEntity<?> getAllMembers(
+    public ResponseEntity<PageResponse<MemberDto>> getAllMembers(
             @RequestParam(value = "page", defaultValue = "1") Integer page,
             @RequestParam(value = "size", defaultValue = "10") Integer size,
             @RequestParam(value = "role", required = false) String role,
@@ -72,11 +74,11 @@ public class SchoolController {
     }
 
     @GetMapping("/teachers")
-    public ResponseEntity<?> getAllTeachers(
+    public ResponseEntity<PageResponse<MemberDto>> getAllTeachers(
             @RequestParam(value = "page", defaultValue = "1") Integer page,
             @RequestParam(value = "size", defaultValue = "10") Integer size,
             @RequestParam(value = "search", required = false) String search) {
-        return ResponseEntity.ok(schoolService.getTeachersResponse(page, size, search));
+        return ResponseEntity.ok(schoolService.getMembersResponse(page, size, RoleConstants.TEACHER, search, null, null));
     }
 
     @GetMapping("/teachers/{id}")
@@ -85,12 +87,12 @@ public class SchoolController {
     }
 
     @PostMapping("/teachers")
-    public ResponseEntity<MemberDto> createTeacher(@RequestBody MemberDto teacherDto) {
+    public ResponseEntity<MemberDto> createTeacher(@Valid @RequestBody MemberDto teacherDto) {
         return ResponseEntity.ok(schoolService.createTeacher(teacherDto));
     }
 
     @PutMapping("/teachers/{id}")
-    public ResponseEntity<MemberDto> updateTeacher(@PathVariable("id") String id, @RequestBody MemberDto teacherDto) {
+    public ResponseEntity<MemberDto> updateTeacher(@PathVariable("id") String id, @Valid @RequestBody MemberDto teacherDto) {
         return ResponseEntity.ok(schoolService.updateTeacher(id, teacherDto));
     }
 
@@ -106,12 +108,12 @@ public class SchoolController {
     }
 
     @PostMapping("/students")
-    public ResponseEntity<MemberDto> createStudent(@RequestBody MemberDto studentDto) {
+    public ResponseEntity<MemberDto> createStudent(@Valid @RequestBody MemberDto studentDto) {
         return ResponseEntity.ok(schoolService.createStudent(studentDto));
     }
 
     @PutMapping("/students/{id}")
-    public ResponseEntity<MemberDto> updateStudent(@PathVariable("id") String id, @RequestBody MemberDto studentDto) {
+    public ResponseEntity<MemberDto> updateStudent(@PathVariable("id") String id, @Valid @RequestBody MemberDto studentDto) {
         return ResponseEntity.ok(schoolService.updateStudent(id, studentDto));
     }
 
@@ -180,7 +182,7 @@ public class SchoolController {
     }
 
     @GetMapping("/grades")
-    public ResponseEntity<?> getAllGrades(
+    public ResponseEntity<PageResponse<Map<String, Object>>> getAllGrades(
             @RequestParam(value = "page", defaultValue = "1") Integer page,
             @RequestParam(value = "size", defaultValue = "10") Integer size,
             @RequestParam(value = "search", required = false) String search,

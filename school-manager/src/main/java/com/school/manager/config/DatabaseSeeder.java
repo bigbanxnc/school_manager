@@ -19,7 +19,9 @@ import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Configuration
 @Slf4j
@@ -289,6 +291,13 @@ public class DatabaseSeeder {
 
                 if (dbData.getGrades() != null) {
                     List<Grade> validGrades = new ArrayList<>();
+                    Map<String, Long> codeToMemberId = new HashMap<>();
+                    for (Member m : memberRepo.findAll()) {
+                        if (m.getCode() != null && m.getId() != null) {
+                            codeToMemberId.put(m.getCode().trim().toUpperCase(), m.getId());
+                        }
+                    }
+
                     for (RawGrade rg : dbData.getGrades()) {
                         String studentCode = resolveStudentCode(rg);
                         if (studentCode == null) {
@@ -296,12 +305,13 @@ public class DatabaseSeeder {
                         }
 
                         String studentCodeUpper = studentCode.toUpperCase();
+                        Long sid = codeToMemberId.get(studentCodeUpper);
                         Grade g = Grade.builder()
-                                .studentId(studentCodeUpper)
+                                .studentId(sid)
                                 .studentCode(studentCodeUpper)
                                 .build();
                         copyScoresFromRawGrade(g, rg);
-                        // Đồng bộ tính toán điểm qua ScoreUtil
+
                         if (g.getMath_oral() == null && rg.getMath() != null) {
                             g.setMath(rg.getMath());
                             g.setLiterature(rg.getLiterature());
@@ -326,7 +336,7 @@ public class DatabaseSeeder {
                                 : (s.getId() != null ? String.valueOf(s.getId()) : null);
                         if (sCode != null) {
                             missingGrades.add(Grade.builder()
-                                    .studentId(sCode)
+                                    .studentId(s.getId())
                                     .studentCode(sCode)
                                     .build());
                         }

@@ -1,5 +1,6 @@
 package com.school.manager.service.impl;
 
+import com.school.manager.constant.RoleConstants;
 import com.school.manager.dto.*;
 import com.school.manager.entity.Grade;
 import com.school.manager.entity.Member;
@@ -29,7 +30,7 @@ import java.util.function.Consumer;
 
 @Slf4j
 @Service
-@Transactional
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class SchoolServiceImpl implements SchoolService {
 
@@ -51,8 +52,6 @@ public class SchoolServiceImpl implements SchoolService {
 
         Member member = memberRepository.findByEmailIgnoreCase(email).orElse(null);
 
-        // Chống rò rỉ và dò quét tài khoản: Đồng nhất thông báo lỗi duy nhất cho cả hai trường hợp
-        // "Email không tồn tại" và "Sai mật khẩu", ngăn chặn hoàn toàn nguy cơ thu thập danh tính người dùng.
         if (member == null || !PasswordUtil.matches(password, member.getPassword())) {
             Map<String, String> errors = new LinkedHashMap<>();
             errors.put("email", "Email hoặc mật khẩu không chính xác!");
@@ -64,13 +63,13 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public void changePassword(ChangePasswordRequestDto request, String authenticatedEmail) {
         if (request == null) {
             throw AppException.badRequest("Vui lòng điền đầy đủ thông tin!");
         }
 
-        // Kiểm soát quyền sở hữu: Bổ sung bước đối chiếu bắt buộc giữa email trong yêu cầu với
-        // danh tính thực tế của tài khoản đang đăng nhập; chỉ chấp thuận khi hai thông tin trùng khớp.
+
         if (authenticatedEmail != null && !authenticatedEmail.trim().isEmpty()) {
             if (!request.getEmail().trim().equalsIgnoreCase(authenticatedEmail.trim())) {
                 throw AppException.forbidden("Bạn không có quyền thay đổi mật khẩu của tài khoản khác!",
@@ -83,8 +82,6 @@ public class SchoolServiceImpl implements SchoolService {
                     Map.of("confirmPassword", "Mật khẩu xác nhận không khớp!"));
         }
 
-        // Tự động hóa kiểm tra dữ liệu đổi mật khẩu đã được xử lý bởi Bean Validation (@Valid) tại Controller.
-        // Tầng Service chỉ tập trung xử lý nghiệp vụ kiểm tra tài khoản và mật khẩu hiện tại.
         Member member = memberRepository.findByEmailIgnoreCase(request.getEmail().trim())
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy tài khoản với email này!",
                         Map.of("email", "Không tìm thấy tài khoản với email hoặc mã này.")));
@@ -106,8 +103,9 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public com.school.manager.dto.ResetPasswordResponseDto resetPasswordByAdmin(String userId, String currentAdminRole) {
-        if (currentAdminRole != null && !currentAdminRole.trim().isEmpty() && !"admin".equalsIgnoreCase(currentAdminRole.trim())) {
+        if (currentAdminRole != null && !currentAdminRole.trim().isEmpty() && !RoleConstants.ADMIN.equalsIgnoreCase(currentAdminRole.trim())) {
             throw AppException.forbidden("Chỉ có Quản trị viên (Admin) mới có quyền reset mật khẩu!");
         }
 
@@ -119,7 +117,7 @@ public class SchoolServiceImpl implements SchoolService {
                 .or(() -> memberRepository.findByEmailIgnoreCase(userId.trim()))
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy tài khoản với mã/ID: " + userId));
 
-        // Sinh mật khẩu ngẫu nhiên 10 ký tự: A-Z, a-z, 0-9 bằng SecureRandom
+
         String rawPassword = PasswordGenerator.generatePassword();
         member.setPassword(PasswordUtil.ensureSha1(rawPassword));
         member.setMustChangePassword(true);
@@ -137,6 +135,7 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public MemberDto forceChangePassword(com.school.manager.dto.ForceChangePasswordRequestDto request, String authenticatedEmail) {
         if (request == null || request.getNewPassword() == null || request.getNewPassword().trim().isEmpty()) {
             throw AppException.badRequest("Mật khẩu mới không được để trống!",
@@ -198,11 +197,11 @@ public class SchoolServiceImpl implements SchoolService {
 
         String normalizedRole = (role != null) ? role.trim().toLowerCase() : "";
         String prefix = switch (normalizedRole) {
-            case "teacher" -> "GV";
-            case "student" -> "HS";
+            case RoleConstants.TEACHER -> "GV";
+            case RoleConstants.STUDENT -> "HS";
             default -> "MEM";
         };
-        int padLength = "student".equals(normalizedRole) ? 3 : 2;
+        int padLength = RoleConstants.STUDENT.equals(normalizedRole) ? 3 : 2;
 
         return prefix + String.format("%0" + padLength + "d", nextNum);
     }
@@ -234,7 +233,7 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
-    public Object getMembersResponse(Integer page, Integer size, String role, String search, String classes, String currentUserId) {
+    public PageResponse<MemberDto> getMembersResponse(Integer page, Integer size, String role, String search, String classes, String currentUserId) {
         int p = (page != null && page > 0) ? page : 1;
         int s = (size != null && size > 0 && size <= 100) ? size : 10;
         Pageable pageable = PageRequest.of(p - 1, s);
@@ -278,47 +277,13 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
-    public Object getTeachersResponse(Integer page, Integer size, String search) {
-        int p = (page != null && page > 0) ? page : 1;
-        int s = (size != null && size > 0 && size <= 100) ? size : 10;
-        Pageable pageable = PageRequest.of(p - 1, s);
-
-        String searchKeyword = "";
-        boolean hasSearch = false;
-        if (search != null && !search.trim().isEmpty()) {
-            searchKeyword = search.trim();
-            hasSearch = true;
-        }
-
-        Page<Member> membersPage = memberRepository.findAll(
-                MemberSpecification.filterMembers("teacher", null, false, null, searchKeyword, hasSearch),
-                pageable);
-
-        List<MemberDto> content = membersPage.getContent().stream()
-                .map(memberMapper::toDto)
-                .toList();
-
-        long totalElements = membersPage.getTotalElements();
-        int totalPages = membersPage.getTotalPages();
-        if (totalElements == 0) {
-            totalPages = 1;
-        }
-        return PageResponse.<MemberDto>builder()
-                .content(content)
-                .totalElements(totalElements)
-                .totalPages(totalPages)
-                .page(p)
-                .size(s)
-                .build();
-    }
-
-    @Override
+    @Transactional
     public MemberDto createTeacher(MemberDto teacherDto) {
         Member entity = memberMapper.toEntity(teacherDto);
         entity.setId(null);
-        entity.setRole("teacher");
+        entity.setRole(RoleConstants.TEACHER);
         entity.setCode((entity.getCode() == null || entity.getCode().trim().isEmpty())
-                ? getNextId("teacher")
+                ? getNextId(RoleConstants.TEACHER)
                 : entity.getCode().trim());
         if (entity.getAssignedClasses() == null) {
             entity.setAssignedClasses(new ArrayList<>());
@@ -332,9 +297,10 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public MemberDto updateTeacher(String id, MemberDto teacherDto) {
         Member teacher = memberRepository.findByIdOrCode(id)
-                .filter(m -> "teacher".equalsIgnoreCase(m.getRole()))
+                .filter(m -> RoleConstants.TEACHER.equalsIgnoreCase(m.getRole()))
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy giáo viên với ID: " + id));
 
         teacher.setName(teacherDto.getName());
@@ -350,18 +316,20 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public void deleteTeacher(String id) {
         if (id == null || id.trim().isEmpty()) {
             throw AppException.notFound("Không tìm thấy giáo viên với ID: " + id);
         }
         Member member = memberRepository.findByIdOrCode(id)
-                .filter(m -> "teacher".equalsIgnoreCase(m.getRole()))
+                .filter(m -> RoleConstants.TEACHER.equalsIgnoreCase(m.getRole()))
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy giáo viên với ID: " + id));
 
         memberRepository.delete(member);
     }
 
     @Override
+    @Transactional
     public MemberDto createStudent(MemberDto studentDto) {
         if (studentDto == null) {
             throw AppException.badRequest("Thông tin học sinh không được để trống!");
@@ -369,18 +337,18 @@ public class SchoolServiceImpl implements SchoolService {
 
         String studentCode = studentDto.getCode();
         if (studentCode == null || studentCode.trim().isEmpty()) {
-            studentCode = getNextId("student");
+            studentCode = getNextId(RoleConstants.STUDENT);
         } else {
             studentCode = studentCode.trim().toUpperCase();
         }
 
-        // Kiểm tra trùng lặp mã học sinh
+
         if (memberRepository.findByCode(studentCode).isPresent()) {
             throw AppException.badRequest("Mã học sinh " + studentCode + " đã tồn tại trong hệ thống!",
                     Map.of("code", "Mã học sinh đã tồn tại trong hệ thống."));
         }
 
-        // Kiểm tra trùng lặp email
+
         String email = studentDto.getEmail();
         if (email != null && !email.trim().isEmpty()) {
             email = email.trim().toLowerCase();
@@ -389,10 +357,9 @@ public class SchoolServiceImpl implements SchoolService {
                         Map.of("email", "Email đã tồn tại trong hệ thống."));
             }
         } else {
-            email = studentCode.toLowerCase() + "@gmail.com";
+            email = null;
         }
 
-        // Xử lý className an toàn để không bị lỗi ràng buộc khóa ngoại (foreign key fk_member_class)
         String cls = studentDto.getClassName();
         if (cls == null || cls.trim().isEmpty() || "unassigned".equalsIgnoreCase(cls.trim()) || "none".equalsIgnoreCase(cls.trim())) {
             cls = null;
@@ -400,23 +367,20 @@ public class SchoolServiceImpl implements SchoolService {
             cls = classRepository.findByIdOrCode(cls.trim()).map(SchoolClass::getCode).orElse(null);
         }
 
-        String name = studentDto.getName();
-        if (name == null || name.trim().isEmpty()) {
-            name = "Học sinh " + studentCode;
-        } else {
-            name = name.trim();
-        }
+        String name = (studentDto.getName() != null && !studentDto.getName().trim().isEmpty())
+                ? studentDto.getName().trim()
+                : null;
 
         String rawPassword = (studentDto.getPassword() != null && !studentDto.getPassword().trim().isEmpty())
-                ? studentDto.getPassword().trim()
-                : PasswordGenerator.generatePassword();
+                ? PasswordUtil.ensureSha1(studentDto.getPassword().trim())
+                : null;
 
         Member entity = Member.builder()
                 .code(studentCode)
                 .name(name)
                 .email(email)
-                .password(PasswordUtil.ensureSha1(rawPassword))
-                .role("student")
+                .password(rawPassword)
+                .role(RoleConstants.STUDENT)
                 .className(cls)
                 .mustChangePassword(false)
                 .assignedClasses(new ArrayList<>())
@@ -424,20 +388,20 @@ public class SchoolServiceImpl implements SchoolService {
 
         Member saved = memberRepository.saveAndFlush(entity);
 
-        // Khởi tạo bản ghi Grade cho học sinh mới để hiển thị đầy đủ trong bảng điểm
+
         if (saved.getId() != null) {
             String sCode = (saved.getCode() != null && !saved.getCode().trim().isEmpty())
                     ? saved.getCode().trim().toUpperCase()
-                    : String.valueOf(saved.getId());
-            boolean gradeExists = gradeRepository.findByStudentCodeIgnoreCase(sCode).isPresent()
-                    || gradeRepository.findByStudentId(saved.getId()).isPresent();
+                    : null;
+            boolean gradeExists = gradeRepository.findByStudentId(saved.getId()).isPresent()
+                    || (sCode != null && gradeRepository.findByStudentCodeIgnoreCase(sCode).isPresent());
             if (!gradeExists) {
                 try {
                     Grade initialGrade = Grade.builder()
-                            .studentId(sCode)
+                            .studentId(saved.getId())
                             .studentCode(sCode)
                             .build();
-                    gradeRepository.saveAndFlush(initialGrade);
+                    gradeRepository.save(initialGrade);
                 } catch (Exception e) {
                     log.warn("Không thể khởi tạo bản ghi điểm ban đầu cho học sinh {}: {}", saved.getCode(), e.getMessage());
                 }
@@ -448,9 +412,10 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public MemberDto updateStudent(String id, MemberDto studentDto) {
         Member student = memberRepository.findByIdOrCode(id)
-                .filter(m -> "student".equalsIgnoreCase(m.getRole()))
+                .filter(m -> RoleConstants.STUDENT.equalsIgnoreCase(m.getRole()))
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy học sinh với ID: " + id));
 
         student.setName(studentDto.getName());
@@ -479,12 +444,13 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public void deleteStudent(String id) {
         if (id == null || id.trim().isEmpty()) {
             throw AppException.notFound("Không tìm thấy học sinh với ID: " + id);
         }
         Member student = memberRepository.findByIdOrCode(id)
-                .filter(m -> "student".equalsIgnoreCase(m.getRole()))
+                .filter(m -> RoleConstants.STUDENT.equalsIgnoreCase(m.getRole()))
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy học sinh với ID: " + id));
 
         if (student.getId() != null) {
@@ -530,6 +496,7 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public SchoolClassDto createClass(SchoolClassDto classDto) {
         if (classDto == null) {
             throw AppException.badRequest("Mã lớp không hợp lệ!");
@@ -555,15 +522,14 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public void deleteClass(String id) {
         SchoolClass schoolClass = classRepository.findByIdOrCode(id)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy lớp học với ID: " + id));
 
         String classCode = schoolClass.getCode();
 
-        // Tối ưu thao tác khi xóa lớp học: Sử dụng Bulk Update ở tầng truy vấn,
-        // trực tiếp làm sạch thông tin lớp của toàn bộ học sinh liên quan trong một thao tác duy nhất.
+
         if (classCode != null) {
             memberRepository.clearClassNameForClass(classCode);
 
@@ -580,9 +546,10 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public MemberDto enrollStudent(String studentId, String className) {
         Member student = memberRepository.findByIdOrCode(studentId)
-                .filter(m -> "student".equalsIgnoreCase(m.getRole()))
+                .filter(m -> RoleConstants.STUDENT.equalsIgnoreCase(m.getRole()))
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy học sinh với ID: " + studentId));
 
         String cls = className;
@@ -606,9 +573,10 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public MemberDto enrollTeacherClass(String teacherId, String className) {
         Member teacher = memberRepository.findByIdOrCode(teacherId)
-                .filter(m -> "teacher".equalsIgnoreCase(m.getRole()))
+                .filter(m -> RoleConstants.TEACHER.equalsIgnoreCase(m.getRole()))
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy giáo viên với ID: " + teacherId));
 
         if (teacher.getAssignedClasses() == null) {
@@ -621,9 +589,10 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public MemberDto unenrollTeacherClass(String teacherId, String className) {
         Member teacher = memberRepository.findByIdOrCode(teacherId)
-                .filter(m -> "teacher".equalsIgnoreCase(m.getRole()))
+                .filter(m -> RoleConstants.TEACHER.equalsIgnoreCase(m.getRole()))
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy giáo viên với ID: " + teacherId));
 
         if (teacher.getAssignedClasses() != null) {
@@ -633,14 +602,7 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
-    public List<GradeDto> getAllGrades() {
-        return gradeRepository.findAll().stream()
-                .map(gradeMapper::toDto)
-                .toList();
-    }
-
-    @Override
-    public Object getGradesResponse(Integer page, Integer size, String search, String classes, String currentUserId, String scoreSubject, String scoreOp, Double scoreVal) {
+    public PageResponse<Map<String, Object>> getGradesResponse(Integer page, Integer size, String search, String classes, String currentUserId, String scoreSubject, String scoreOp, Double scoreVal) {
         int p = (page != null && page > 0) ? page : 1;
         int s = (size != null && size > 0 && size <= 100) ? size : 10;
         Pageable pageable = PageRequest.of(p - 1, s);
@@ -660,38 +622,41 @@ public class SchoolServiceImpl implements SchoolService {
         int totalPages = gradesPage.getTotalPages();
         List<Map<String, Object>> content = new ArrayList<>();
 
-        Map<String, Member> studentMap = new HashMap<>();
+        Map<Long, Member> studentById = new HashMap<>();
+        Map<String, Member> studentByCode = new HashMap<>();
         memberRepository.findAll().forEach(m -> {
             if (m != null) {
                 if (m.getId() != null) {
-                    studentMap.put(String.valueOf(m.getId()), m);
+                    studentById.put(m.getId(), m);
                 }
                 if (m.getCode() != null) {
-                    studentMap.put(m.getCode().trim().toLowerCase(), m);
+                    studentByCode.put(m.getCode().trim().toLowerCase(), m);
                 }
             }
         });
 
         for (Grade gEntity : gradesPage.getContent()) {
             if (gEntity == null) continue;
-            String lookupKey = gEntity.getStudentCode() != null ? gEntity.getStudentCode().trim().toLowerCase() : (gEntity.getStudentId() != null ? gEntity.getStudentId().trim().toLowerCase() : "");
-            Member sEntity = studentMap.get(lookupKey);
-            if (sEntity == null && gEntity.getStudentId() != null) {
-                sEntity = studentMap.get(gEntity.getStudentId().trim().toLowerCase());
+            Member sEntity = null;
+            if (gEntity.getStudentId() != null) {
+                sEntity = studentById.get(gEntity.getStudentId());
+            }
+            if (sEntity == null && gEntity.getStudentCode() != null) {
+                sEntity = studentByCode.get(gEntity.getStudentCode().trim().toLowerCase());
             }
             if (sEntity == null) {
-                String code = gEntity.getStudentCode() != null ? gEntity.getStudentCode() : (gEntity.getStudentId() != null ? gEntity.getStudentId() : "HS0");
+                String code = gEntity.getStudentCode() != null ? gEntity.getStudentCode() : "HS0";
                 sEntity = Member.builder()
                         .code(code)
                         .name("Học sinh " + code)
-                        .role("student")
+                        .role(RoleConstants.STUDENT)
                         .className("Chưa xếp lớp")
                         .build();
             }
             GradeDto gDto = gradeMapper.toDto(gEntity);
             if (gDto != null) {
                 gDto.setStudentCode(sEntity.getCode());
-                gDto.setStudentId(sEntity.getCode());
+                gDto.setStudentId(sEntity.getId());
             }
             content.add(buildStudentGradeRecord(memberMapper.toDto(sEntity), gDto, subject));
         }
@@ -714,7 +679,7 @@ public class SchoolServiceImpl implements SchoolService {
             return null;
         }
         return memberRepository.findByIdOrCode(userId)
-                .filter(m -> "teacher".equalsIgnoreCase(m.getRole()))
+                .filter(m -> RoleConstants.TEACHER.equalsIgnoreCase(m.getRole()))
                 .map(Member::getSubject)
                 .orElse(null);
     }
@@ -806,7 +771,7 @@ public class SchoolServiceImpl implements SchoolService {
             return Collections.emptyMap();
         }
         Member student = memberRepository.findByIdOrCode(studentId)
-                .filter(m -> "student".equalsIgnoreCase(m.getRole()))
+                .filter(m -> RoleConstants.STUDENT.equalsIgnoreCase(m.getRole()))
                 .orElse(null);
 
         GradeDto grade = null;
@@ -817,13 +782,13 @@ public class SchoolServiceImpl implements SchoolService {
                         .orElse(null);
             }
             if (grade == null && student.getCode() != null) {
-                grade = gradeRepository.findByStudentIdOrCode(student.getCode())
+                grade = gradeRepository.findByStudentCodeIgnoreCase(student.getCode())
                         .map(gradeMapper::toDto)
                         .orElse(null);
             }
         }
         if (grade == null) {
-            grade = gradeRepository.findByStudentIdOrCode(studentId)
+            grade = gradeRepository.findByStudentCodeIgnoreCase(studentId)
                     .map(gradeMapper::toDto)
                     .orElse(null);
         }
@@ -900,12 +865,13 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public GradeDto saveGrade(String studentId, GradeDto gradeDto) {
         if (studentId == null || studentId.trim().isEmpty()) {
             throw AppException.badRequest("Mã học sinh không được để trống!");
         }
         Member student = memberRepository.findByIdOrCode(studentId)
-                .filter(m -> "student".equalsIgnoreCase(m.getRole()))
+                .filter(m -> RoleConstants.STUDENT.equalsIgnoreCase(m.getRole()))
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy học sinh với ID: " + studentId));
 
         Long studentIdLong = student.getId();
@@ -932,6 +898,7 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public Map<String, Object> saveGradeRecord(String studentId, GradeDto gradeDto) {
         GradeDto saved = saveGrade(studentId, gradeDto);
         String subject = getTeacherSubject(gradeDto != null ? gradeDto.getUpdatedBy() : null);
@@ -939,12 +906,13 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public void deleteGrade(String studentId) {
         if (studentId == null || studentId.trim().isEmpty()) {
             throw AppException.notFound("Không tìm thấy bảng điểm!");
         }
         Member student = memberRepository.findByIdOrCode(studentId)
-                .filter(m -> "student".equalsIgnoreCase(m.getRole()))
+                .filter(m -> RoleConstants.STUDENT.equalsIgnoreCase(m.getRole()))
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy học sinh: " + studentId));
 
         if (student.getId() != null) {
@@ -954,12 +922,13 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public void deleteSubjectGrade(String studentId, String subject) {
         if (studentId == null || studentId.trim().isEmpty()) {
             return;
         }
         Member student = memberRepository.findByIdOrCode(studentId)
-                .filter(m -> "student".equalsIgnoreCase(m.getRole()))
+                .filter(m -> RoleConstants.STUDENT.equalsIgnoreCase(m.getRole()))
                 .orElse(null);
 
         if (student != null && student.getId() != null) {
@@ -1050,7 +1019,7 @@ public class SchoolServiceImpl implements SchoolService {
             throw AppException.notFound("Không tìm thấy giáo viên!");
         }
         return memberRepository.findByIdOrCode(id)
-                .filter(m -> "teacher".equalsIgnoreCase(m.getRole()))
+                .filter(m -> RoleConstants.TEACHER.equalsIgnoreCase(m.getRole()))
                 .map(memberMapper::toDto)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy giáo viên với ID: " + id));
     }
@@ -1061,7 +1030,7 @@ public class SchoolServiceImpl implements SchoolService {
             throw AppException.notFound("Không tìm thấy học sinh!");
         }
         return memberRepository.findByIdOrCode(id)
-                .filter(m -> "student".equalsIgnoreCase(m.getRole()))
+                .filter(m -> RoleConstants.STUDENT.equalsIgnoreCase(m.getRole()))
                 .map(memberMapper::toDto)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy học sinh với ID: " + id));
     }
@@ -1089,9 +1058,10 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public List<MemberDto> autoAssignTeachers() {
         List<SchoolClass> classes = classRepository.findAll();
-        List<Member> teachers = memberRepository.findByRole("teacher");
+        List<Member> teachers = memberRepository.findByRole(RoleConstants.TEACHER);
 
         if (classes.isEmpty() || teachers.isEmpty()) {
             return getAllMembers();
@@ -1174,11 +1144,12 @@ public class SchoolServiceImpl implements SchoolService {
     }
 
     @Override
+    @Transactional
     public MemberDto autoAssignSingleTeacher(String teacherId) {
         Member teacher = memberRepository.findByIdOrCode(teacherId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy giáo viên."));
 
-        if (!"teacher".equalsIgnoreCase(teacher.getRole())) {
+        if (!RoleConstants.TEACHER.equalsIgnoreCase(teacher.getRole())) {
             throw AppException.badRequest("Thành viên không phải là giáo viên.");
         }
 
@@ -1188,7 +1159,7 @@ public class SchoolServiceImpl implements SchoolService {
         }
 
         List<SchoolClass> classes = classRepository.findAll();
-        List<Member> allTeachers = memberRepository.findByRole("teacher");
+        List<Member> allTeachers = memberRepository.findByRole(RoleConstants.TEACHER);
 
         if (teacher.getAssignedClasses() == null) {
             teacher.setAssignedClasses(new ArrayList<>());

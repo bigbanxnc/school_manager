@@ -13,6 +13,13 @@ import java.util.Optional;
 @Repository
 public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecificationExecutor<Member> {
 
+    @Override
+    @org.springframework.lang.NonNull
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"assignedClasses"})
+    org.springframework.data.domain.Page<Member> findAll(
+            @org.springframework.lang.Nullable org.springframework.data.jpa.domain.Specification<Member> spec,
+            @org.springframework.lang.NonNull org.springframework.data.domain.Pageable pageable);
+
     Optional<Member> findByCode(String code);
 
     @Query("SELECT m FROM Member m WHERE LOWER(m.email) = LOWER(:email)")

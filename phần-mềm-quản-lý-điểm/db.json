@@ -243,7 +243,8 @@
         "studentViewGrades": false,
         "teacherAutoClaimClass": true,
         "manageRolePermissions": false
-      }
+      },
+      "mustChangePassword": false
     },
     {
       "id": "GV06",

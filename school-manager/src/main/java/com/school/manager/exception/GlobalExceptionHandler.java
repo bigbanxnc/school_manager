@@ -29,7 +29,6 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @RestControllerAdvice
-@SuppressWarnings("unused")
 public class GlobalExceptionHandler {
 
     @Data
@@ -47,16 +46,15 @@ public class GlobalExceptionHandler {
     }
 
     @Getter
-    @SuppressWarnings("unused")
     public static class AppException extends ResponseStatusException {
         private final HttpStatus status;
         private final Map<String, String> errors;
 
-        public AppException(HttpStatus status, String message) {
+        public AppException(@org.springframework.lang.Nullable HttpStatus status, String message) {
             this(status, message, null);
         }
 
-        public AppException(HttpStatus status, String message, Map<String, String> errors) {
+        public AppException(@org.springframework.lang.Nullable HttpStatus status, String message, @org.springframework.lang.Nullable Map<String, String> errors) {
             super(status != null ? status : HttpStatus.INTERNAL_SERVER_ERROR, message != null ? message : "");
             this.status = (status != null) ? status : HttpStatus.INTERNAL_SERVER_ERROR;
             this.errors = errors;
@@ -169,6 +167,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex, HttpServletRequest request) {
+
         Map<String, String> fieldErrors = new LinkedHashMap<>();
         for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
             String field = fieldError.getField();

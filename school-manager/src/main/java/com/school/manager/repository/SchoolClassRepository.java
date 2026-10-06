@@ -16,8 +16,6 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Long> 
 
     boolean existsByCodeIgnoreCase(String code);
 
-    boolean existsByCode(String code);
-
     default Optional<SchoolClass> findByIdOrCode(String idOrCode) {
         if (idOrCode == null || idOrCode.trim().isEmpty()) {
             return Optional.empty();

@@ -12,7 +12,8 @@ import java.util.function.Consumer;
 
 @Entity
 @Table(name = "grades", indexes = {
-        @Index(name = "idx_grade_student_id", columnList = "student_id", unique = true)
+        @Index(name = "idx_grade_student_id", columnList = "student_id", unique = true),
+        @Index(name = "idx_grade_student_code", columnList = "student_code")
 })
 @Data
 @NoArgsConstructor
@@ -24,46 +25,28 @@ public class Grade {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @com.fasterxml.jackson.annotation.JsonSetter("id")
-    public void deserializeId(Object val) {
-        if (val instanceof Number num) {
-            this.id = num.longValue();
-        } else if (val instanceof String s && !s.trim().isEmpty()) {
-            try {
-                this.id = Long.parseLong(s.trim());
-            } catch (NumberFormatException e) {
-                if (this.studentCode == null || this.studentCode.trim().isEmpty()) {
-                    this.studentCode = s.trim();
-                }
-            }
-        }
-    }
-
-    @Column(name = "student_id", length = 50, nullable = false)
-    private String studentId;
+    @Column(name = "student_id", nullable = false)
+    private Long studentId;
 
     @Column(name = "student_code", length = 50)
     private String studentCode;
 
-    @com.fasterxml.jackson.annotation.JsonSetter("studentId")
-    public void deserializeStudentId(Object val) {
-        if (val != null) {
-            String str = String.valueOf(val).trim();
-            this.studentId = str;
-            if (this.studentCode == null || this.studentCode.trim().isEmpty()) {
-                this.studentCode = str;
-            }
-        }
-    }
+    @OneToMany(mappedBy = "grade", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<SubjectScore> subjectScores = new java.util.ArrayList<>();
 
     public static class GradeBuilder {
         public GradeBuilder studentId(Long studentId) {
-            this.studentId = studentId != null ? String.valueOf(studentId) : null;
+            this.studentId = studentId;
             return this;
         }
 
         public GradeBuilder studentId(String studentId) {
-            this.studentId = studentId;
+            if (studentId != null && !studentId.trim().isEmpty()) {
+                try {
+                    this.studentId = Long.parseLong(studentId.trim());
+                } catch (NumberFormatException ignored) {}
+            }
             return this;
         }
     }

@@ -4,6 +4,7 @@ import com.school.manager.dto.ChangePasswordRequestDto;
 import com.school.manager.dto.GradeDto;
 import com.school.manager.dto.LoginRequestDto;
 import com.school.manager.dto.MemberDto;
+import com.school.manager.dto.PageResponse;
 import com.school.manager.dto.SchoolClassDto;
 
 import java.util.List;
@@ -33,7 +34,6 @@ public interface SchoolService {
     MemberDto enrollTeacherClass(String teacherId, String className);
     MemberDto unenrollTeacherClass(String teacherId, String className);
 
-    List<GradeDto> getAllGrades();
     GradeDto saveGrade(String studentId, GradeDto gradeDto);
     void deleteGrade(String studentId);
     void deleteSubjectGrade(String studentId, String subject);
@@ -51,9 +51,8 @@ public interface SchoolService {
 
     String getNextId(String role);
 
-    Object getMembersResponse(Integer page, Integer size, String role, String search, String classes, String currentUserId);
-    Object getTeachersResponse(Integer page, Integer size, String search);
-    Object getGradesResponse(Integer page, Integer size, String search, String classes, String currentUserId, String scoreSubject, String scoreOp, Double scoreVal);
+    PageResponse<MemberDto> getMembersResponse(Integer page, Integer size, String role, String search, String classes, String currentUserId);
+    PageResponse<Map<String, Object>> getGradesResponse(Integer page, Integer size, String search, String classes, String currentUserId, String scoreSubject, String scoreOp, Double scoreVal);
     Map<String, Object> getStudentGradeRecord(String studentId, String currentUserId);
     Map<String, Object> saveGradeRecord(String studentId, GradeDto gradeDto);
 

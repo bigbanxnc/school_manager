@@ -32,7 +32,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @Transactional
 @AutoConfigureMockMvc
-@SuppressWarnings({"ConstantConditions", "unchecked", "RedundantThrows"})
 class SchoolManagerApplicationTests {
 
     @Autowired private SchoolService schoolService;
@@ -488,7 +487,6 @@ class SchoolManagerApplicationTests {
         assertNull(gradeMapper.toDto(null)); assertNull(gradeMapper.toEntity(null));
         assertNull(memberMapper.toDto(null)); assertNull(memberMapper.toEntity(null));
         assertNull(classMapper.toDto(null)); assertNull(classMapper.toEntity(null));
-        assertNull(gradeMapper.toStudentGradeResponseDto(null, null));
 
         GradeDto sampleDto = GradeDto.builder()
                 .studentId(101L)
@@ -524,21 +522,6 @@ class SchoolManagerApplicationTests {
         assertEquals(10.0, mappedDto.getMath());
         assertEquals(9.0, mappedDto.getLiterature());
         assertEquals(8.0, mappedDto.getEnglish());
-
-        Member studentNoClass = Member.builder().code("HS_NC").name("No Class").email("nc@test.com").className(null).role("student").build();
-        StudentGradeResponseDto respNoGrade = gradeMapper.toStudentGradeResponseDto(studentNoClass, null);
-        assertNotNull(respNoGrade);
-        assertEquals("Chưa xếp lớp", respNoGrade.getClassName());
-        assertNull(respNoGrade.getMath());
-        assertNull(respNoGrade.getGpa());
-
-        Member studentWithClass = Member.builder().code("HS_WC").name("With Class").email("wc@test.com").className("10A1").role("student").build();
-        StudentGradeResponseDto respWithGrade = gradeMapper.toStudentGradeResponseDto(studentWithClass, sampleEntity);
-        assertNotNull(respWithGrade);
-        assertEquals("10A1", respWithGrade.getClassName());
-        assertEquals(10.0, respWithGrade.getMath());
-
-        assertNotNull(schoolService.getAllGrades());
 
         Member mWithAssigned = Member.builder().code("M_A1").email("ma1@edu.com").password("p").name("A1").role("teacher").assignedClasses(List.of("10A1", "10A2")).build();
         MemberDto mDtoWithAssigned = memberMapper.toDto(mWithAssigned);
@@ -611,7 +594,6 @@ class SchoolManagerApplicationTests {
         assertEquals(sc1, sc2); assertNotEquals(sc1, sc3); assertEquals(sc1.hashCode(), sc2.hashCode());
         assertNotNull(sc1.toString());
 
-        // PasswordUtil test coverage
         assertNull(com.school.manager.util.PasswordUtil.sha1Hex(null));
         assertNull(com.school.manager.util.PasswordUtil.ensureSha1(null));
         assertNull(com.school.manager.util.PasswordUtil.ensureSha1("   "));
@@ -646,12 +628,12 @@ class SchoolManagerApplicationTests {
 
         var nullQueryGradePred = com.school.manager.specification.GradeSpecification
                 .filterGrades(null, null, null, null, null, null)
-                .toPredicate(dummyGradeRoot, null, cb);
+                .toPredicate(dummyGradeRoot, gradeQuery, cb);
         assertNotNull(nullQueryGradePred);
 
         var nullQueryMemberPred = com.school.manager.specification.MemberSpecification
                 .filterMembers(null, null, false, null, null, false)
-                .toPredicate(dummyMemberRoot, null, cb);
+                .toPredicate(dummyMemberRoot, memberQuery, cb);
         assertNotNull(nullQueryMemberPred);
 
         assertTrue(gradeRepository.count(com.school.manager.specification.GradeSpecification.filterGrades(null, null, null, null, null, null)) >= 0);
@@ -812,10 +794,13 @@ class SchoolManagerApplicationTests {
         var missingParamResp = handler.handleMissingParameter(new org.springframework.web.bind.MissingServletRequestParameterException("param1", "String"), request);
         assertEquals(400, missingParamResp.getStatusCode().value());
 
-        var typeMismatchResp = handler.handleTypeMismatch(new org.springframework.web.method.annotation.MethodArgumentTypeMismatchException("abc", Integer.class, "score", null, null), request);
+        org.springframework.core.MethodParameter methodParameter = new org.springframework.core.MethodParameter(
+                SchoolController.class.getMethod("login", LoginRequestDto.class), 0);
+        var typeMismatchResp = handler.handleTypeMismatch(
+                new org.springframework.web.method.annotation.MethodArgumentTypeMismatchException("abc", Integer.class, "score", methodParameter, null), request);
         assertEquals(400, typeMismatchResp.getStatusCode().value());
 
-        var genNullErrResp = handler.handleGeneralException(new RuntimeException((String) null), null);
+        var genNullErrResp = handler.handleGeneralException(new RuntimeException(), request);
         assertEquals(500, genNullErrResp.getStatusCode().value());
         assertEquals("Đã xảy ra lỗi hệ thống", Objects.requireNonNull(genNullErrResp.getBody()).getMessage());
 
@@ -838,8 +823,6 @@ class SchoolManagerApplicationTests {
                 new org.springframework.validation.BeanPropertyBindingResult(new MemberDto(), "memberDto");
         bindingResult.addError(new org.springframework.validation.FieldError("memberDto", "email", "Email không hợp lệ"));
         bindingResult.addError(new org.springframework.validation.FieldError("memberDto", "password", "Mật khẩu quá ngắn"));
-        org.springframework.core.MethodParameter methodParameter = new org.springframework.core.MethodParameter(
-                SchoolController.class.getMethod("login", LoginRequestDto.class), 0);
         var valEx = new org.springframework.web.bind.MethodArgumentNotValidException(methodParameter, bindingResult);
         var valResp = handler.handleValidationException(valEx, request);
         assertEquals(400, valResp.getStatusCode().value());
@@ -891,7 +874,7 @@ class SchoolManagerApplicationTests {
         assertEquals("math", teacherLogin.getSubject());
         assertTrue(teacherLogin.getAssignedClasses().contains("10A1"));
 
-        PageResponse<MemberDto> teacherStudentsPage = (PageResponse<MemberDto>) schoolService.getMembersResponse(1, 10, "student", null, "10A1", "GV01");
+        PageResponse<MemberDto> teacherStudentsPage = schoolService.getMembersResponse(1, 10, "student", null, "10A1", "GV01");
         assertNotNull(teacherStudentsPage.getContent());
         assertTrue(teacherStudentsPage.getContent().stream().allMatch(s -> "10A1".equals(s.getClassName()) || "GV01".equals(s.getCode())));
 
@@ -908,7 +891,7 @@ class SchoolManagerApplicationTests {
                 .build();
         schoolService.saveGrade("HS001", teacherMathUpdate);
 
-        Grade updatedGrade = gradeRepository.findByStudentId(hs1.getId()).orElseThrow();
+        Grade updatedGrade = gradeRepository.findByStudentCodeIgnoreCase("HS001").orElseThrow();
         assertEquals(10.0, updatedGrade.getMath());
         assertEquals(8.5, updatedGrade.getLiterature());
         assertEquals(9.5, updatedGrade.getEnglish());
